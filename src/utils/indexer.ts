@@ -131,7 +131,7 @@ export class Indexer {
       if (info.blocks > latest) return { run: true, latest };
       return { run: false, latest };
     } catch (e) {
-      return { run: true, latest: 814000 }; // @todo fix it
+      return { run: true, latest: 814552 }; // @todo fix it
     }
   }
 

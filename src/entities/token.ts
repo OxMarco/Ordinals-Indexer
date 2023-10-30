@@ -2,6 +2,9 @@ import { Exclude, Expose } from 'class-transformer';
 
 export class TokenEntity {
   @Expose()
+  pid: number;
+
+  @Expose()
   ticker: string;
 
   @Expose()
@@ -23,6 +26,9 @@ export class TokenEntity {
   metadata: string;
 
   @Expose()
+  ref?: string;
+
+  @Expose()
   traits?: string;
 
   @Expose()
@@ -33,6 +39,9 @@ export class TokenEntity {
 
   @Expose()
   txId: string;
+
+  @Expose()
+  block: number;
 
   @Exclude()
   balances: any;

@@ -1,33 +1,46 @@
 version: '3.8'
+
 services:
-  app:
-    env_file:
-      - .env
-    build: 
-      context: .
-      dockerfile: Dockerfile
+  nestjs-app:
+    container_name: nestjs-backend
+    build: .
     ports:
       - "3000:3000"
-  #   depends_on:
-  #     - mongodb
-  #     - redis
+    environment:
+      DATABASE_URL: "mongodb://mongoadmin:mongopassword@mongo:27017/nestjsdb?authSource=admin"
+      DATABASE_USER: "mongoadmin"
+      DATABASE_PASSWORD: "mongopassword"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_USERNAME: "redisuser"
+      REDIS_PASSWORD: "redispassword"
+      REDIS_DB_NAME: "nestjsredis"
+    depends_on:
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
 
-  # mongodb:
-  #   image: mongo:latest
-  #   ports:
-  #     - "27017:27017"
-  #   volumes:
-  #     - mongodb_data:/data/db
+  redis:
+    image: "redis:alpine"
+    container_name: redis
+    command: redis-server --requirepass redispassword
+    environment:
+      - REDIS_REPLICATION_MODE=master
+    ports:
+      - "6379:6379"
 
-  # redis:
-  #   image: redis:latest
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
+  mongo:
+    image: "mongo:latest"
+    container_name: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongoadmin
+      MONGO_INITDB_ROOT_PASSWORD: mongopassword
+      MONGO_INITDB_DATABASE: nestjsdb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data_container:/data/db
 
-# volumes:
-#   mongodb_data:
-#     driver: local
-#   redis_data:
-#     driver: local
+volumes:
+  mongodb_data_container:
