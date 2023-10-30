@@ -8,13 +8,13 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN yarn install
 
 # Copy the rest of the application into the working directory
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN yarn run build
 
 # Expose port 3000 (or the port your app is set to run on)
 EXPOSE 3000
