@@ -3,9 +3,12 @@ import { HydratedDocument } from 'mongoose';
 
 export type TokenDocument = HydratedDocument<Token>;
 
-@Schema({ timestamps: false })
+@Schema({ timestamps: true })
 export class Token {
-  @Prop({ required: true })
+  @Prop({ required: false })
+  pid: number;
+
+  @Prop({ required: true, index: true })
   ticker: string;
 
   @Prop({ required: true })
@@ -27,23 +30,29 @@ export class Token {
   metadata: string;
 
   @Prop({ required: false })
+  ref?: string;
+
+  @Prop({ required: false })
   traits?: string;
 
   @Prop({ required: true })
   collectionNumber: number;
 
-  @Prop({ required: true })
+  @Prop({ required: true, index: true })
   collectionAddress: string;
 
   @Prop({ required: true })
   txId: string;
 
-  @Prop(
-    raw({
-      address: { type: String },
-      balance: { type: String },
-    }),
-  )
+  @Prop({ required: true, index: true })
+  block: number;
+
+  @Prop({
+    type: Map,
+    of: { type: String },
+    default: { null: 0 },
+    required: true,
+  })
   balances: Map<string, string>;
 }
 

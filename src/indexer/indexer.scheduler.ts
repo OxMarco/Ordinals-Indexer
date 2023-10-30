@@ -22,9 +22,8 @@ export class IndexScheduler implements OnModuleDestroy {
     this.running = false;
   }
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
+  @Cron(CronExpression.EVERY_SECOND)
   async handleCron() {
-    this.logger.debug('Cron job invoked');
     if (this.running) return;
 
     const { run, latest } = await this.indexer.mustIndex();
@@ -36,7 +35,6 @@ export class IndexScheduler implements OnModuleDestroy {
   async runIndexing(block: number) {
     this.running = true;
 
-    this.logger.debug(`Indexing block #${block}`);
     const res = await this.indexer.index(block);
     if (res == IndexerErrors.REORG) {
       await this.indexer.cleanup(block - 8, block);
