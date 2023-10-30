@@ -14,10 +14,13 @@ export enum ActionType {
 @Schema({ timestamps: true })
 export class Action {
   @Prop({ required: true })
+  from: string;
+
+  @Prop({ required: true })
   to: string;
 
-  @Prop({ required: false })
-  value?: number;
+  @Prop({ required: true })
+  value: number;
 
   @Prop({ type: String, enum: Object.values(ActionType), required: true })
   type: ActionType;

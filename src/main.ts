@@ -10,7 +10,7 @@ async function bootstrap() {
       transform: true, // auto-transform request payloads to specified types
     }),
   );
-
+  app.enableShutdownHooks();
   await app.listen(3000);
 }
 bootstrap();
