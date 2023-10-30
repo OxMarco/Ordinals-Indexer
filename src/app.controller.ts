@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   HttpStatus,
-  ParseFilePipe,
   ParseFilePipeBuilder,
   Post,
   UploadedFile,

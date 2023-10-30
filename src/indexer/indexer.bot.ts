@@ -3,7 +3,6 @@ import { EmbedBuilder } from 'discord.js';
 import { Context, Options, SlashCommand, SlashCommandContext } from 'necord';
 import { IndexerService } from './indexer.service';
 import { TokenDto } from 'src/dtos/token';
-import { text } from 'stream/consumers';
 import { HelpRequestDto } from 'src/dtos/help-request';
 
 @Injectable()
@@ -49,34 +48,41 @@ export class IndexerBot {
     const token = await this.indexerService.get(ticker, id);
     if (!token) {
       return interaction.reply({ content: `Token ${ticker}:${id} not found` });
+    }
+
+    const name = `Token ${ticker}:${id}`;
+    const description = `*MaxSupply*: ${token.maxSupply}
+    *Collection #*: ${token.collectionNumber}
+    *Collection address*: ${token.collectionAddress}
+    *Deployment block*: ${token.block}`;
+
+    if (token?.mime && token.mime.includes('image'))
+      return interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(name)
+            .setDescription(description)
+            .setImage(
+              'http://localhost:3000/indexer/token-metadata/' +
+                token.ticker +
+                '/' +
+                token.id,
+            ), // @todo change to prod url
+        ],
+      });
+    else if (token?.ref) {
+      return interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(name)
+            .setDescription(description)
+            .setImage(token.ref),
+        ],
+      });
     } else {
-      if (token.mime.includes('image'))
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle(`Token ${ticker}:${id}`)
-              .setDescription(
-                `*MaxSupply*: ${token.maxSupply}\n*Collection address*: ${token.collectionAddress}`,
-              )
-              .setImage(
-                'http://localhost:3000/indexer/token-metadata/' +
-                  token.ticker +
-                  '/' +
-                  token.id,
-              ), // @todo change to prod url
-          ],
-        });
-      else {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle(`Token ${ticker}:${id}`)
-              .setDescription(
-                `*MaxSupply*: ${token.maxSupply}\n*Collection address*: ${token.collectionAddress}`,
-              ),
-          ],
-        });
-      }
+      return interaction.reply({
+        embeds: [new EmbedBuilder().setTitle(name).setDescription(description)],
+      });
     }
   }
 }

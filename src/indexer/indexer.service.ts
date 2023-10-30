@@ -54,6 +54,17 @@ export class IndexerService {
     }
   }
 
+  async getByCollectionAddress(address: string) {
+    try {
+      const tokens = await this.tokenModel
+        .find({ collectionAddress: address })
+        .exec();
+      return tokens;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
   async getTokenBalanceByAddress(ticker: string, id: number, address: string) {
     try {
       const token = await this.tokenModel.findOne({ ticker, id }).exec();
@@ -78,10 +89,54 @@ export class IndexerService {
     }
   }
 
+  async getByPid(pid: number) {
+    try {
+      return await this.tokenModel.find({ pid }).exec();
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getByBlock(block: number) {
+    try {
+      return await this.tokenModel.find({ block }).exec();
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
   async getTokenMetadata(ticker: string, id: number) {
     try {
       const token = await this.tokenModel.findOne({ ticker, id }).exec();
-      return { metadata: token?.metadata, mime: token?.mime };
+      return { metadata: token?.metadata, mime: token?.mime, ref: token?.ref };
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getTokenSupplyInfo(ticker: string, id: number) {
+    try {
+      const token = await this.tokenModel.findOne({ ticker, id }).exec();
+      if (!token) {
+        return null;
+      }
+
+      const balances = Array.from(token.balances.values());
+      const sum = balances.reduce(
+        (acc, balance) => acc + BigInt(balance),
+        BigInt(0),
+      );
+
+      return { total: BigInt(token.maxSupply), circulating: sum.toString() };
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async findByTickerSimilarity(ticker: string) {
+    try {
+      const regex = new RegExp(ticker, 'i');
+      return await this.tokenModel.find({ ticker: { $regex: regex } }).exec();
     } catch (error) {
       throw new Error(error.message);
     }
@@ -102,15 +157,33 @@ export class IndexerService {
   }
 
   async updateTokenBalances(
-    filter: any,
+    ticker: string,
+    id: number,
     values: { address: string; balance: bigint },
   ) {
-    const token = await this.tokenModel.findOne(filter).exec();
+    const token = await this.tokenModel
+      .findOne({
+        ticker,
+        id,
+      })
+      .exec();
     if (token !== null) {
-      const newBalance =
-        BigInt(token.balances.get(values.address) || 0) + values.balance;
-      token.balances.set(values.address, newBalance.toString());
+      const address = values.address;
+      const currentBalance = BigInt(token.balances.get(address) || '0');
+      const newBalance = currentBalance + values.balance;
+
+      token.balances.set(address, newBalance.toString());
       await token.save();
+    } else {
+      throw new Error('token not found');
+    }
+  }
+
+  async removeAll(block: number) {
+    try {
+      await this.tokenModel.deleteMany({ block }).exec();
+    } catch (error) {
+      throw new Error(error.message);
     }
   }
 

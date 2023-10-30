@@ -102,8 +102,10 @@ export class Indexer {
   }
 
   async cleanup(fromBlock: number, toBlock: number) {
-    for (let block = fromBlock; block <= toBlock; block++)
+    for (let block = fromBlock; block <= toBlock; block++) {
+      this.service.removeAll(block);
       this.db.removeAll(block);
+    }
   }
 
   async getLatestIndexedBlock() {
@@ -117,7 +119,7 @@ export class Indexer {
       if (info.blocks > latest) return { run: true, latest };
       return { run: false, latest };
     } catch (e) {
-      return { run: true, latest: 814000 }; // @todo fix it this.legacy_block_end };
+      return { run: true, latest: 814000 }; // @todo fix it
     }
   }
 
@@ -701,8 +703,8 @@ export class Indexer {
 
                   ///////
 
-                  this.logger.debug('Saving new token deployment');
-                  const token = this.service.saveNewToken({
+                  this.logger.debug(`${ticker}:${id} was just deployed`);
+                  await this.service.saveNewToken({
                     ticker,
                     id,
                     decimals,
@@ -710,11 +712,12 @@ export class Indexer {
                     limit,
                     mime,
                     metadata: img,
+                    block,
+                    ref,
                     collectionNumber: collection_number,
                     collectionAddress: collection_address,
                     txId: tx.txid,
                   });
-                  await token.save();
                 }
                 break;
               }
@@ -776,11 +779,11 @@ export class Indexer {
               amt: _mint.toString(),
             };
 
-            this.logger.debug('Updating token transfer');
-            await this.service.updateTokenBalances(
-              { ticker, id: id },
-              { address: to_address, balance: _mint },
-            );
+            this.logger.debug(`${ticker}:${id} was just minted on deploy`);
+            await this.service.updateTokenBalances(ticker, id, {
+              address: to_address,
+              balance: _mint,
+            });
 
             d.lim = d.lim.toString();
             d.rem = d.rem.toString();
@@ -977,11 +980,13 @@ export class Indexer {
           await this.db.set(utxo, JSON.stringify(utxos[i]));
         }
 
-        this.logger.debug('Updating token balances');
-        await this.service.updateTokenBalances(
-          { ticker: utxos[i].tick, id: utxos[i].id },
-          { address: utxos[i].addr, balance: utxos[i].amt },
+        this.logger.debug(
+          `${utxos[i].tick}:${utxos[i].id} was just transferred`,
         );
+        await this.service.updateTokenBalances(utxos[i].tick, utxos[i].id, {
+          address: utxos[i].addr,
+          balance: utxos[i].amt,
+        });
       }
     }
   }
@@ -1082,11 +1087,13 @@ export class Indexer {
           amt: _mint.toString(),
         };
 
-        this.logger.debug('Updating token balances');
-        await this.service.updateTokenBalances(
-          { ticker: deployment.tick, id: id },
-          { address: to_address, balance: _mint },
+        this.logger.debug(
+          `${deployment.tick}:${deployment.id} was just minted`,
         );
+        await this.service.updateTokenBalances(deployment.tick, id, {
+          address: to_address,
+          balance: _mint,
+        });
 
         await this.db.set(utxo, JSON.stringify(_utxo));
         await this.db.set('d_' + ticker + '_' + id, JSON.stringify(deployment));
