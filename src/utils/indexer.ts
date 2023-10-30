@@ -98,7 +98,19 @@ export class Indexer {
   }
 
   async close() {
-    await this.db.close();
+    while(true)
+    {
+      try {
+        await this.db.get('mrk');
+      } catch(e) {
+        await this.db.close();
+        this.db = undefined as any;
+        this.service = undefined;
+        this.logger.debug('Indexer closed');
+        return;
+      }
+      new Promise(resolve => setTimeout(resolve, 10));
+    }
   }
 
   async cleanup(fromBlock: number, toBlock: number) {

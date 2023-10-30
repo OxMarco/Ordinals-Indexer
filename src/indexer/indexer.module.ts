@@ -35,7 +35,7 @@ import { TokenGateway } from 'src/events/token.gateway';
   providers: [
     IndexScheduler,
     IndexerService,
-    IndexerBot,
+    //IndexerBot,
     TokenCreatedListener,
     TokenGateway,
   ],

@@ -46,7 +46,7 @@ import { IndexerModule } from './indexer/indexer.module';
       }),
       inject: [ConfigService],
     }),
-    NecordModule.forRootAsync({
+    /*NecordModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) =>
         ({
@@ -54,7 +54,7 @@ import { IndexerModule } from './indexer/indexer.module';
           intents: ['Guilds', 'GuildMessages'],
         } as NecordModuleOptions),
       inject: [ConfigService],
-    }),
+    }),*/
     IndexerModule,
   ],
   controllers: [AppController],
