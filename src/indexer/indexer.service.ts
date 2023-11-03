@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import { Token } from 'src/schemas/token';
 import { TokenCreatedEvent } from 'src/events/token-created.event';
 import { ConfigService } from '@nestjs/config';
+import { Utxo } from 'src/schemas/utxo';
 
 @Injectable()
 export class IndexerService {
@@ -14,6 +15,7 @@ export class IndexerService {
 
   constructor(
     @InjectModel(Token.name) private tokenModel: Model<Token>,
+    @InjectModel(Utxo.name) private utxoModel: Model<Utxo>,
     private eventEmitter: EventEmitter2,
     private configService: ConfigService,
   ) {
@@ -202,6 +204,28 @@ export class IndexerService {
       const address = values.address;
       token.balances.set(address, values.newBalance);
       await token.save();
+    } else {
+      console.log(`token ${ticker}:${id} not found`);
+    }
+  }
+
+  async addUtxo(address: string, txid: string, vout: number, amount: string, ticker: string, id: number) {
+    const token = await this.tokenModel
+    .findOne({
+      ticker,
+      id,
+    })
+    .exec();
+    if (token !== null) {
+      const utxoData = {
+        address,
+        txId: txid,
+        vout,
+        amount,
+        token: token._id,
+      }
+      const newUtxo = new this.utxoModel(utxoData);
+      await newUtxo.save();
     } else {
       console.log(`token ${ticker}:${id} not found`);
     }

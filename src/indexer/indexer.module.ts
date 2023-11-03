@@ -11,6 +11,7 @@ import { IndexerService } from './indexer.service';
 import { TokenCreatedListener } from 'src/events/token.listener';
 import { IndexerBot } from './indexer.bot';
 import { TokenGateway } from 'src/events/token.gateway';
+import { Utxo, UtxoSchema } from 'src/schemas/utxo';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { TokenGateway } from 'src/events/token.gateway';
         inject: [getConnectionToken()],
       },
     ]),
+    MongooseModule.forFeature([{ name: Utxo.name, schema: UtxoSchema }]),
   ],
   controllers: [IndexerController],
   providers: [

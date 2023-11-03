@@ -102,8 +102,8 @@ export class Indexer {
     this.db = new LevelDbAdapter('pipe_bin_db');
   }
 
-  async _addUtxo(txid: string, vout_n: number, utxto: any) {
-
+  async _addUtxo(address: string, txid: string, vout: number, amount: string, ticker: string, id: number) {
+    await this.service.addUtxo(address, txid, vout, amount, ticker, id);
   }
 
   async _updateBalance(ticker: string, id: number, addr: any, balance: string) {
@@ -476,7 +476,7 @@ export class Indexer {
                       await this._updateBalance(_utxo.tick, _utxo.id, to_address, amt.toString());
 
                       await this.db.put(utxo, JSON.stringify(_utxo));
-                      await this._addUtxo(tx.tx[i].txid, j, _utxo);
+                      await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
                     } catch (e) {
                       await this.db.put(
                         address_amt,
@@ -484,7 +484,7 @@ export class Indexer {
                       );
                       await this._updateBalance(_utxo.tick, _utxo.id, to_address, spent_token_count[sig].toString());
                       await this.db.put(utxo, JSON.stringify(_utxo));
-                      await this._addUtxo(tx.tx[i].txid, j, _utxo);
+                      await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
                     }
 
                     break;
@@ -695,14 +695,15 @@ export class Indexer {
           await this._updateBalance(utxos[i].tick, utxos[i].id, utxos[i].addr, amt.toString());
 
           await this.db.put(utxo, JSON.stringify(utxos[i]));
-          await this._addUtxo(utxos[i].txid, utxos[i].vout, utxos[i]);
+          await this._addUtxo(utxos[i].addr, utxos[i].txid, utxos[i].vout, utxos[i].amt, utxos[i].tick, utxos[i].id);
+
           //console.log('3rd push', utxos[i]);
         } catch (e) {
           await this.db.put(address_amt, utxos[i].amt);
           await this._updateBalance(utxos[i].tick, utxos[i].id, utxos[i].addr, utxos[i].amt.toString());
 
           await this.db.put(utxo, JSON.stringify(utxos[i]));
-          await this._addUtxo(utxos[i].txid, utxos[i].vout, utxos[i]);
+          await this._addUtxo(utxos[i].addr, utxos[i].txid, utxos[i].vout, utxos[i].amt, utxos[i].tick, utxos[i].id);
           //console.log('4th push', utxos[i]);
         }
       }
@@ -822,7 +823,7 @@ export class Indexer {
         };
 
         await this.db.put(utxo, JSON.stringify(_utxo));
-        await this._addUtxo(tx.txid, output, _utxo);
+        await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
 
         await this.db.put('d_' + ticker + '_' + id, JSON.stringify(deployment));
         await this._updateDeployment(deployment);
@@ -1287,7 +1288,7 @@ export class Indexer {
             const utxo = 'utxo_' + tx.txid + '_' + mint_to_beneficiary_output;
 
             const _utxo = {
-              addr: mint_to_beneficiary_to_address,
+              addr: mint_to_beneficiary_to_address || "",
               txid: tx.txid,
               vout: mint_to_beneficiary_output,
               tick: ticker,
@@ -1300,7 +1301,7 @@ export class Indexer {
             d.max = d.max.toString();
 
             await this.db.put(utxo, JSON.stringify(_utxo));
-            await this._addUtxo(tx.txid, mint_to_beneficiary_output, _utxo);
+            await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
 
             await this.db.put('d_' + ticker + '_' + id, JSON.stringify(d));
             await this._saveDeployment(d);
