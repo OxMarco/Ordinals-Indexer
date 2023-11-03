@@ -1,8 +1,10 @@
 import { Logger } from '@nestjs/common';
-import { Address, Script, Tx } from '@cmdcode/tapscript';
+import { Address, Networks, Script, Tx } from '@cmdcode/tapscript';
 import { RPC } from 'src/utils/rpc';
 import {
+  cleanFloat,
   countDecimals,
+  formatNumberString,
   hexToBytes,
   hexToString,
   resolveNumberString,
@@ -12,38 +14,6 @@ import { LevelDbAdapter } from 'src/utils/db';
 
 type SpentTokenCount = {
   [key: string]: bigint;
-};
-
-const op_table: any = {
-  p: '50',
-  d: '44',
-  m: '4d',
-  a: '41',
-  i: '49',
-  r: '52',
-  n: '4e',
-  tr: '5452',
-  t: '54',
-  b: '42',
-  i_OP_0: 0,
-  i_OP_FALSE: 0,
-  i_OP_1: 1,
-  i_OP_TRUE: 1,
-  i_OP_2: 2,
-  i_OP_3: 3,
-  i_OP_4: 4,
-  i_OP_5: 5,
-  i_OP_6: 6,
-  i_OP_7: 7,
-  i_OP_8: 8,
-  i_OP_9: 9,
-  i_OP_10: 10,
-  i_OP_11: 11,
-  i_OP_12: 12,
-  i_OP_13: 13,
-  i_OP_14: 14,
-  i_OP_15: 15,
-  i_OP_16: 16,
 };
 
 export const enum IndexerErrors {
@@ -60,6 +30,70 @@ export class Indexer {
   private legacy_block_end = 810000;
   private total_limit = 18446744073709551615n;
 
+  private op_table: any = {
+    p: '50',
+    d: '44',
+    m: '4d',
+    a: '41',
+    i: '49',
+    r: '52',
+    n: '4e',
+    tr: '5452',
+    t: '54',
+    b: '42',
+    i_OP_0: 0,
+    i_OP_FALSE: 0,
+    i_OP_1: 1,
+    i_OP_TRUE: 1,
+    i_OP_2: 2,
+    i_OP_3: 3,
+    i_OP_4: 4,
+    i_OP_5: 5,
+    i_OP_6: 6,
+    i_OP_7: 7,
+    i_OP_8: 8,
+    i_OP_9: 9,
+    i_OP_10: 10,
+    i_OP_11: 11,
+    i_OP_12: 12,
+    i_OP_13: 13,
+    i_OP_14: 14,
+    i_OP_15: 15,
+    i_OP_16: 16,
+  };
+
+  // might become handy later w/ explorer feature
+  private supported_mimes = [
+    'application/json',
+    'application/pdf',
+    'application/pgp-signature',
+    'application/protobuf',
+    'application/yaml',
+    'audio/flac',
+    'audio/mpeg',
+    'audio/wav',
+    'image/apng',
+    'image/avif',
+    'image/gif',
+    'image/jpeg',
+    'image/png',
+    'image/svg+xml',
+    'image/webp',
+    'model/gltf+json',
+    'model/gltf-binary',
+    'model/stl',
+    'text/css',
+    'text/html',
+    'text/html;charset=utf-8',
+    'text/javascript',
+    'text/markdown',
+    'text/markdown;charset=utf-8',
+    'text/plain',
+    'text/plain;charset=utf-8',
+    'video/mp4',
+    'video/webm',
+  ];
+
   constructor(url: string, service: any) {
     this.logger = new Logger(Indexer.name);
     this.service = service;
@@ -68,15 +102,135 @@ export class Indexer {
     this.db = new LevelDbAdapter('pipe_bin_db');
   }
 
-  async getDeployment(ticker: string, id: number) {
+  async _addUtxo(txid: string, vout_n: number, utxto: any) {
+
+  }
+
+  async _updateBalance(ticker: string, id: number, addr: any, balance: string) {
+    await this.service.updateTokenBalances(ticker, id, { address: addr, newBalance: balance });
+  }
+
+  async _saveDeployment(deployment: any) {
+    const data = {
+      ticker: deployment.tick,
+      id: deployment.id,
+      beneficiaryAddress: deployment.baddr,
+      decimals: deployment.dec,
+      maxSupply: deployment.max,
+      remaining: deployment.rem,
+      limit: deployment.lim,
+      collectionNumber: deployment.colnum,
+      collectionAddress: deployment.col,
+      txId: deployment.tx,
+      block: deployment.blck,
+      bvo: deployment.bvo,
+      vo: deployment.vo,
+    }
+
+    await this.service.saveNewToken(data);
+  }
+
+  async _updateDeployment(deployment: any) {
+    const ticker = deployment?.tick || deployment.ticker;
+
+    const data = {
+      collectionNumber: deployment?.colnum,
+      traits: deployment?.traits,
+      mime: deployment?.mime,
+      ref: deployment?.ref,
+      metadata: deployment?.metadata,
+      remaining: deployment?.rem,
+      limit: deployment?.lim,
+    }
+
+    await this.service.updateTokenData(ticker, deployment.id, data);
+  }
+
+  async _increaseMax(ticker: string, id: number, max: string) {
+    await this.service.updateTokenData(ticker, id, { maxSupply: max + 1});
+  }
+
+  async close() {
+    while (true) {
+      try {
+        await this.db.get('mrk');
+      } catch (e) {
+        await this.db.close();
+        this.db = undefined as any;
+        this.service = undefined;
+        this.logger.log('Indexer closed');
+        return;
+      }
+      new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
+  async cleanup(fromBlock: number, toBlock: number) {
+    for (let block = fromBlock; block <= toBlock; block++) {
+      console.log("Clean up block: "+block);
+      this.service.removeAll(block);
+      this.db.removeAll(block);
+    }
+  }
+
+  async getLatestIndexedBlock() {
+    return await this.db.get('bchk');
+  }
+
+  /**
+   * Returns the current max. number for a collectible
+   *
+   * @param address
+   * @returns {Promise<any|null>}
+   */
+  async getCollectibleMax(address: string) {
     try {
-      const value = await this.db.get('d_' + ticker.toLowerCase() + '_' + id);
-      return JSON.parse(value);
+      return JSON.parse(await this.db.get('c_max_' + address));
     } catch (e) {}
 
     return null;
   }
 
+  /**
+   * Returns the collectible information, if any (PIPE | Art)
+   *
+   * @param address
+   * @param num
+   * @returns {Promise<any|null>}
+   */
+  async getCollectible(address: string, num: number) {
+    try {
+      return JSON.parse(await this.db.get('c_' + address + '_' + num));
+    } catch (e) {}
+
+    return null;
+  }
+
+  /**
+   * Returns the deployment data of a selected set of ticker and id.
+   *
+   * @param ticker
+   * @param id
+   * @returns {Promise<any|null>}
+   */
+  async getDeployment(ticker: string, id: number) {
+    try {
+      return JSON.parse(
+        await this.db.get('d_' + ticker.toLowerCase() + '_' + id),
+      );
+    } catch (e) {}
+
+    return null;
+  }
+
+  /**
+   * Returns an address (utxo) based token balance.
+   *
+   * @param address
+   * @param ticker
+   * @param id
+   * @returns {Promise<{ticker, amt_big: string, decimals: *, amt, id}|null>}
+   */
   async getBalance(address: string, ticker: string, id: number) {
     try {
       const deployment = await this.getDeployment(ticker, id);
@@ -89,39 +243,12 @@ export class Indexer {
           id: deployment.id,
           decimals: deployment.dec,
           amt_big: amt.toString(),
-          amt: amt * deployment.dec,
+          amt: cleanFloat(formatNumberString(amt.toString(), deployment.dec)),
         };
       }
     } catch (e) {}
 
     return null;
-  }
-
-  async close() {
-    while(true)
-    {
-      try {
-        await this.db.get('mrk');
-      } catch(e) {
-        await this.db.close();
-        this.db = undefined as any;
-        this.service = undefined;
-        this.logger.debug('Indexer closed');
-        return;
-      }
-      new Promise(resolve => setTimeout(resolve, 10));
-    }
-  }
-
-  async cleanup(fromBlock: number, toBlock: number) {
-    for (let block = fromBlock; block <= toBlock; block++) {
-      this.service.removeAll(block);
-      this.db.removeAll(block);
-    }
-  }
-
-  async getLatestIndexedBlock() {
-    return await this.db.get('bchk');
   }
 
   async mustIndex() {
@@ -131,16 +258,23 @@ export class Indexer {
       if (info.blocks > latest) return { run: true, latest };
       return { run: false, latest };
     } catch (e) {
-      return { run: true, latest: 814552 }; // @todo fix it
+      return { run: true, latest: 809607 };
     }
   }
 
-  async index(block: number) {
+  /**
+   * Main indexing function.
+   * Calls DMT functions, depending on the op_return status.
+   *
+   * @param network
+   * @returns {Promise<void>}
+   */
+  async index(block: number, network: Networks = 'main') {
     this.db.setBlock(block);
 
     try {
       try {
-        const block_check = await this.getLatestIndexedBlock();
+        const block_check = await this.db.get('bchk');
 
         if (block_check === block) {
           this.logger.warn('Block already analysed');
@@ -162,18 +296,18 @@ export class Indexer {
           const prev_recorded_blockhash = await this.db.get('bh');
 
           if (prev_blockhash !== prev_recorded_blockhash) {
-            await this.db.set('reorg', '');
+            await this.db.put('reorg', '');
           }
         } catch (e) {}
       }
 
-      this.logger.debug(`Start indexing block ${block}`);
+    //  this.logger.debug(`Start indexing block ${block}`);
 
       const blockhash = await this.rpc.call('getblockhash', [block]);
       const tx = await this.rpc.call('getblock', [blockhash, 3]);
 
-      await this.db.set('mrk', '');
-      await this.db.set('bchk', block);
+      await this.db.put('mrk', '');
+      await this.db.put('bchk', block);
 
       for (let i = 0; i < tx.tx.length; i++) {
         try {
@@ -216,8 +350,10 @@ export class Indexer {
                 if (amt < 0n) {
                   amt = 0n;
                 }
-                await this.db.set(address_amt, amt.toString());
-                await this.db.set('spent_' + utxo, _utxo);
+                await this.db.put(address_amt, amt.toString());
+                await this._updateBalance(old_utxo.tick, old_utxo.id, old_utxo.addr, amt.toString());
+
+                await this.db.put('spent_' + utxo, _utxo);
                 await this.db.del(utxo);
 
                 // in case needed later on to assign non-op_return transactions
@@ -249,13 +385,13 @@ export class Indexer {
             decoded !== null &&
             decoded.length > 2 &&
             decoded[0] === 'OP_RETURN' &&
-            decoded[1] === op_table.p
+            decoded[1] === this.op_table.p
           ) {
             if (op_return_count !== 1) continue;
             if (res.vout.length < 2) continue;
 
             switch (decoded[2]) {
-              case op_table.d:
+              case this.op_table.d:
                 await this.indexDeployment(
                   block,
                   blockhash,
@@ -263,9 +399,10 @@ export class Indexer {
                   tx.tx[i],
                   res,
                   decoded,
+                  network,
                 );
                 break;
-              case op_table.m:
+              case this.op_table.m:
                 await this.indexMint(
                   block,
                   blockhash,
@@ -273,9 +410,10 @@ export class Indexer {
                   tx.tx[i],
                   res,
                   decoded,
+                  network,
                 );
                 break;
-              case op_table.t:
+              case this.op_table.t:
                 await this.indexTransfer(
                   block,
                   blockhash,
@@ -283,6 +421,7 @@ export class Indexer {
                   tx.tx[i],
                   res,
                   decoded,
+                  network,
                 );
                 break;
             }
@@ -306,6 +445,7 @@ export class Indexer {
                   try {
                     const to_address = Address.fromScriptPubKey(
                       res.vout[j].scriptPubKey,
+                      network,
                     );
                     const utxo = 'utxo_' + tx.tx[i].txid + '_' + j;
                     const address_amt = 'a_' + to_address + '_' + sig;
@@ -332,14 +472,19 @@ export class Indexer {
                     try {
                       let amt = await this.db.get(address_amt);
                       amt = BigInt(amt) + spent_token_count[sig];
-                      await this.db.set(address_amt, amt.toString());
-                      await this.db.set(utxo, JSON.stringify(_utxo));
+                      await this.db.put(address_amt, amt.toString());
+                      await this._updateBalance(_utxo.tick, _utxo.id, to_address, amt.toString());
+
+                      await this.db.put(utxo, JSON.stringify(_utxo));
+                      await this._addUtxo(tx.tx[i].txid, j, _utxo);
                     } catch (e) {
-                      await this.db.set(
+                      await this.db.put(
                         address_amt,
                         spent_token_count[sig].toString(),
                       );
-                      await this.db.set(utxo, JSON.stringify(_utxo));
+                      await this._updateBalance(_utxo.tick, _utxo.id, to_address, spent_token_count[sig].toString());
+                      await this.db.put(utxo, JSON.stringify(_utxo));
+                      await this._addUtxo(tx.tx[i].txid, j, _utxo);
                     }
 
                     break;
@@ -353,8 +498,8 @@ export class Indexer {
         } catch (e) {}
       }
 
-      await this.db.set('b', block);
-      await this.db.set('bh', blockhash);
+      await this.db.put('b', block);
+      await this.db.put('bh', blockhash);
       await this.db.del('mrk');
     } catch (e) {}
 
@@ -363,13 +508,364 @@ export class Indexer {
     return IndexerErrors.OK;
   }
 
-  async indexDeployment(
+  /**
+   * Transfer function to associate tokens based on the op_return data.
+   * Creates 4 outputs: 0 = recipient, 1 = token change, 2 = op_return, 3 = sats change
+   *
+   * @param block
+   * @param blockhash
+   * @param vout
+   * @param tx
+   * @param res
+   * @param ops
+   * @param network
+   * @returns {Promise<void>}
+   */
+  async indexTransfer(
     block: number,
-    blockhash: any,
+    blockhash: string,
+    vout: any,
+    tx: any,
+    res: any,
+    ops: string[],
+    network: Networks = 'main',
+  ) {
+    // op count must be uneven
+    if (ops.length % 2 === 0) return;
+
+    // must at least include a full quadruple
+    if (ops.length < 7) return;
+
+    // let's check for the amount of quadruples we got
+    const tuples_length = ops.length - 3;
+
+    // check for potential presence of all quadruples
+    if (tuples_length % 4 !== 0) return;
+
+    let utxos: any = [];
+    const outputs: any = [];
+
+    for (let i = 3; i < ops.length; i += 4) {
+      const hex = ops[i];
+      const base = 10;
+      const bn = BigInt('0x' + hex);
+      const int_ticker = BigInt(bn.toString(base));
+
+      const ticker = toString26(int_ticker);
+      if (ticker === '') return;
+
+      const id =
+        ops[i + 1].startsWith('OP_') &&
+        typeof this.op_table['i_' + ops[i + 1] as keyof typeof this.op_table] !== 'undefined'
+          ? this.op_table['i_' + ops[i + 1] as keyof typeof this.op_table]
+          : parseInt(ops[i + 1], 16);
+      if (isNaN(id) || id < 0 || id > 999999) return;
+
+      const output =
+        ops[i + 2].startsWith('OP_') &&
+        typeof this.op_table['i_' + ops[i + 2] as keyof typeof this.op_table] !== 'undefined'
+          ? this.op_table['i_' + ops[i + 2] as keyof typeof this.op_table]
+          : parseInt(ops[i + 2], 16);
+      if (isNaN(output) || output < 0) return;
+
+      let transfer;
+
+      if (block < this.legacy_block_end) {
+        if (isNaN(parseInt(hexToString(ops[i + 3])))) {
+          transfer = ops[i + 3];
+        } else {
+          transfer = hexToString(ops[i + 3]);
+        }
+      } else {
+        transfer = hexToString(ops[i + 3]);
+      }
+
+      if (transfer.startsWith('0') && !transfer.startsWith('0.')) return;
+      if (transfer.includes('.') && transfer.endsWith('0')) return;
+      if (transfer.endsWith('.')) return;
+
+      const deployment = await this.getDeployment(ticker, id);
+
+      if (deployment !== null) {
+        if (countDecimals(transfer) > deployment.dec) return;
+
+        transfer = resolveNumberString(transfer, deployment.dec);
+
+        const _total_limit = this.total_limit;
+        const _transfer = BigInt(transfer);
+
+        if (_transfer <= 0 || _transfer > _total_limit) return;
+
+        if (typeof res.vout[output] === 'undefined') return;
+        const res_vout = Script.decode(res.vout[output].scriptPubKey, false);
+        if (res_vout[0] === 'OP_RETURN') return;
+
+        try {
+          const to_address = Address.fromScriptPubKey(
+            res.vout[output].scriptPubKey,
+            network,
+          );
+
+          const _utxo = {
+            addr: to_address,
+            txid: tx.txid,
+            vout: output,
+            tick: deployment.tick,
+            id: deployment.id,
+            amt: _transfer.toString(),
+          };
+
+          // outputs can only be used once or the transfer is invalid and tokens are lost
+          if (outputs.includes(output)) {
+            utxos = [];
+            break;
+          }
+
+          utxos.push(_utxo);
+          outputs.push(output);
+
+          //console.log('1st push', _utxo);
+        } catch (e) {
+          this.logger.error(e);
+        }
+      }
+    }
+
+    if (utxos.length > 0) {
+      const token_count: SpentTokenCount = {};
+      const spent_token_count: SpentTokenCount = {};
+
+      for (let i = 0; i < res.vin.length; i++) {
+        try {
+          let spent_utxo = await this.db.get(
+            'spent_utxo_' + res.vin[i].txid + '_' + res.vin[i].vout,
+          );
+          spent_utxo = JSON.parse(spent_utxo);
+
+          const sig = spent_utxo.tick + '-' + spent_utxo.id;
+
+          if (typeof spent_token_count[sig] === 'undefined') {
+            spent_token_count[sig] = 0n;
+          }
+
+          spent_token_count[sig] += BigInt(spent_utxo.amt);
+        } catch (e) {}
+      }
+
+      for (let i = 0; i < utxos.length; i++) {
+        const sig = utxos[i].tick + '-' + utxos[i].id;
+
+        if (typeof token_count[sig] === 'undefined') {
+          token_count[sig] = 0n;
+        }
+
+        token_count[sig] += BigInt(utxos[i].amt);
+      }
+
+      for (const sig in spent_token_count) {
+        if (typeof token_count[sig] !== 'undefined') {
+          if (spent_token_count[sig] < token_count[sig]) {
+            // token count cannot exceed the spent count.
+            // invalid transfer.
+            return;
+          }
+        }
+      }
+
+      //console.log('2nd push', spent_token_count, token_count);
+
+      for (let i = 0; i < utxos.length; i++) {
+        const sig = utxos[i].tick + '-' + utxos[i].id;
+
+        if (
+          typeof spent_token_count[sig] === 'undefined' ||
+          typeof token_count[sig] === 'undefined'
+        ) {
+          return;
+        }
+
+        const utxo = 'utxo_' + utxos[i].txid + '_' + utxos[i].vout;
+        const address_amt =
+          'a_' + utxos[i].addr + '_' + utxos[i].tick + '_' + utxos[i].id;
+
+        try {
+          let amt = await this.db.get(address_amt);
+          amt = BigInt(amt) + BigInt(utxos[i].amt);
+          await this.db.put(address_amt, amt.toString());
+          await this._updateBalance(utxos[i].tick, utxos[i].id, utxos[i].addr, amt.toString());
+
+          await this.db.put(utxo, JSON.stringify(utxos[i]));
+          await this._addUtxo(utxos[i].txid, utxos[i].vout, utxos[i]);
+          //console.log('3rd push', utxos[i]);
+        } catch (e) {
+          await this.db.put(address_amt, utxos[i].amt);
+          await this._updateBalance(utxos[i].tick, utxos[i].id, utxos[i].addr, utxos[i].amt.toString());
+
+          await this.db.put(utxo, JSON.stringify(utxos[i]));
+          await this._addUtxo(utxos[i].txid, utxos[i].vout, utxos[i]);
+          //console.log('4th push', utxos[i]);
+        }
+      }
+    }
+  }
+
+  /**
+   * Manages mints for the selected ticker:id in the op_return it is processing.
+   *
+   * @param block
+   * @param blockhash
+   * @param vout
+   * @param tx
+   * @param res
+   * @param ops
+   * @param network
+   * @returns {Promise<void>}
+   */
+  async indexMint(
+    block: number,
+    blockhash: string,
     vout: any,
     tx: any,
     res: any,
     ops: any,
+    network: Networks = 'main',
+  ) {
+    if (ops.length !== 7) return;
+
+    const hex = ops[3];
+    const base = 10;
+    const bn = BigInt('0x' + hex);
+    const int_ticker = BigInt(bn.toString(base));
+
+    const ticker = toString26(int_ticker);
+    if (ticker === '') return;
+
+    const id =
+      ops[4].startsWith('OP_') &&
+      typeof this.op_table['i_' + ops[4]] !== 'undefined'
+        ? this.op_table['i_' + ops[4]]
+        : parseInt(ops[4], 16);
+    if (isNaN(id) || id < 0 || id > 999999) return;
+
+    const output =
+      ops[5].startsWith('OP_') &&
+      typeof this.op_table['i_' + ops[5]] !== 'undefined'
+        ? this.op_table['i_' + ops[5]]
+        : parseInt(ops[5], 16);
+    if (isNaN(output) || output < 0) return;
+
+    let mint;
+
+    if (block < this.legacy_block_end) {
+      if (isNaN(parseInt(hexToString(ops[6])))) {
+        mint = ops[6];
+      } else {
+        mint = hexToString(ops[6]);
+      }
+    } else {
+      mint = hexToString(ops[6]);
+    }
+
+    if (mint.startsWith('0') && !mint.startsWith('0.')) return;
+    if (mint.includes('.') && mint.endsWith('0')) return;
+    if (mint.endsWith('.')) return;
+
+    const deployment = await this.getDeployment(ticker, id);
+
+    if (deployment !== null) {
+      if (countDecimals(mint) > deployment.dec) return;
+
+      deployment.lim = BigInt(deployment.lim);
+      deployment.rem = BigInt(deployment.rem);
+
+      mint = resolveNumberString(mint, deployment.dec);
+
+      const _total_limit = this.total_limit;
+      let _mint = BigInt(mint);
+
+      if (_mint <= 0 || _mint > _total_limit) return;
+
+      if (typeof res.vout[output] === 'undefined') return;
+      const res_vout = Script.decode(res.vout[output].scriptPubKey, false);
+      if (res_vout[0] === 'OP_RETURN') return;
+
+      if (deployment.rem === 0n) return;
+      if (
+        _mint <= 0n ||
+        _mint > deployment.lim ||
+        deployment.lim > deployment.max
+      )
+        return;
+
+      if (deployment.rem - _mint < 0n) {
+        _mint = deployment.rem;
+      }
+
+      deployment.rem -= _mint;
+      deployment.lim = deployment.lim.toString();
+      deployment.rem = deployment.rem.toString();
+
+      try {
+        const to_address = Address.fromScriptPubKey(
+          res.vout[output].scriptPubKey,
+          network,
+        );
+        const utxo = 'utxo_' + tx.txid + '_' + output;
+
+        const _utxo = {
+          addr: to_address,
+          txid: tx.txid,
+          vout: output,
+          tick: deployment.tick,
+          id: deployment.id,
+          amt: _mint.toString(),
+        };
+
+        await this.db.put(utxo, JSON.stringify(_utxo));
+        await this._addUtxo(tx.txid, output, _utxo);
+
+        await this.db.put('d_' + ticker + '_' + id, JSON.stringify(deployment));
+        await this._updateDeployment(deployment);
+        const address_amt = 'a_' + to_address + '_' + ticker + '_' + id;
+
+        try {
+          let amt = await this.db.get(address_amt);
+          amt = BigInt(amt) + _mint;
+          await this.db.put(address_amt, amt.toString());
+          await this._updateBalance(ticker, id, to_address, amt.toString());
+        } catch (e) {
+          await this.db.put(address_amt, _utxo.amt);
+          await this._updateBalance(ticker, id, to_address, _utxo.amt.toString());
+        }
+
+        //console.log(await this.db.get(utxo));
+      } catch (e) {
+        this.logger.error(e);
+      }
+    }
+  }
+
+  /**
+   * Manages deployments for the selected ticker:id in the op_return it is processing.
+   * This also includes collectible attachments (PIPE | Art) from the transaction's witness data.
+   *
+   * @param block
+   * @param blockhash
+   * @param vout
+   * @param tx
+   * @param res
+   * @param ops
+   * @param network
+   * @returns {Promise<void>}
+   */
+  async indexDeployment(
+    block: number,
+    blockhash: string,
+    vout: any,
+    tx: any,
+    res: any,
+    ops: any,
+    network: Networks = 'main',
   ) {
     try {
       if (ops.length !== 9) return;
@@ -379,22 +875,22 @@ export class Indexer {
 
       const id =
         ops[4].startsWith('OP_') &&
-        typeof op_table['i_' + ops[4]] !== 'undefined'
-          ? op_table['i_' + ops[4]]
+        typeof this.op_table['i_' + ops[4]] !== 'undefined'
+          ? this.op_table['i_' + ops[4]]
           : parseInt(ops[4], 16);
       if (isNaN(id) || id < 0 || id > 999999) return;
 
       const output =
         ops[5].startsWith('OP_') &&
-        typeof op_table['i_' + ops[5]] !== 'undefined'
-          ? op_table['i_' + ops[5]]
+        typeof this.op_table['i_' + ops[5]] !== 'undefined'
+          ? this.op_table['i_' + ops[5]]
           : parseInt(ops[5], 16);
       if (isNaN(output) || output < 0) return;
 
       const decimals =
         ops[6].startsWith('OP_') &&
-        typeof op_table['i_' + ops[6]] !== 'undefined'
-          ? op_table['i_' + ops[6]]
+        typeof this.op_table['i_' + ops[6]] !== 'undefined'
+          ? this.op_table['i_' + ops[6]]
           : parseInt(ops[6], 16);
       if (isNaN(decimals) || decimals < 0 || decimals > 8) return;
 
@@ -453,6 +949,7 @@ export class Indexer {
 
       const to_address = Address.fromScriptPubKey(
         res.vout[output].scriptPubKey,
+        network,
       );
 
       const deployment = 'd_' + ticker + '_' + id;
@@ -473,17 +970,20 @@ export class Indexer {
 
               if (
                 decoded.length >= 12 &&
-                decoded[4] === op_table.p &&
-                decoded[5] === op_table.a
+                decoded[4] === this.op_table.p &&
+                decoded[5] === this.op_table.a
               ) {
-                if (decoded[6] !== op_table.i && decoded[6] !== op_table.r) {
+                if (
+                  decoded[6] !== this.op_table.i &&
+                  decoded[6] !== this.op_table.r
+                ) {
                   return;
                 }
 
                 let mime = null;
                 let ref = null;
 
-                if (decoded[6] === op_table.i) {
+                if (decoded[6] === this.op_table.i) {
                   try {
                     mime = hexToString(decoded[7]);
                     const bytes = hexToBytes(decoded[8]);
@@ -494,14 +994,14 @@ export class Indexer {
                   } catch (e) {
                     return;
                   }
-                } else if (decoded[6] === op_table.r) {
+                } else if (decoded[6] === this.op_table.r) {
                   ref = new TextDecoder().decode(hexToBytes(decoded[8]));
 
                   if (ref === '' || ref.includes('\x00') || ref === 'OP_0') {
                     return;
                   }
 
-                  if (decoded[9] !== op_table.n) {
+                  if (decoded[9] !== this.op_table.n) {
                     return;
                   }
                 } else {
@@ -511,7 +1011,7 @@ export class Indexer {
                 let number_position = 0;
 
                 for (let j = 0; j < decoded.length; j++) {
-                  if (decoded[j] === op_table.n) {
+                  if (decoded[j] === this.op_table.n) {
                     number_position = j;
                     break;
                   }
@@ -526,20 +1026,19 @@ export class Indexer {
                   return;
                 }
 
-                // @todo check
-                const decodedNum1 = decoded[number_position + 1];
-                const num1 =
-                  decodedNum1.startsWith('OP_') &&
-                  typeof op_table['i_' + decodedNum1] !== 'undefined'
-                    ? op_table['i_' + decodedNum1]
-                    : parseInt(decodedNum1, 16);
+                let num1: any = decoded[number_position + 1];
+                num1 =
+                  num1.startsWith('OP_') &&
+                  typeof this.op_table['i_' + num1] !== 'undefined'
+                    ? this.op_table['i_' + num1]
+                    : parseInt(num1, 16);
 
-                const decodedNum2 = decoded[number_position + 2];
-                const num2 =
-                  decodedNum2.startsWith('OP_') &&
-                  typeof op_table['i_' + decodedNum2] !== 'undefined'
-                    ? parseInt(op_table['i_' + decodedNum2])
-                    : parseInt(decodedNum2, 16);
+                let num2: any = decoded[number_position + 2];
+                num2 =
+                  num2.startsWith('OP_') &&
+                  typeof this.op_table['i_' + num2] !== 'undefined'
+                    ? this.op_table['i_' + num2]
+                    : parseInt(num2, 16);
 
                 if (
                   isNaN(num1) ||
@@ -553,16 +1052,17 @@ export class Indexer {
 
                 if (
                   typeof decoded[number_position + 3] !== 'undefined' &&
-                  decoded[number_position + 3] === op_table.b &&
+                  decoded[number_position + 3] === this.op_table.b &&
                   typeof decoded[number_position + 4] !== 'undefined' &&
                   decoded[number_position + 4] !== 'OP_0'
                 ) {
                   mint_to_beneficiary = true;
                   mint_to_beneficiary_output =
                     decoded[number_position + 4].startsWith('OP_') &&
-                    typeof op_table['i_' + decoded[number_position + 4]] !==
-                      'undefined'
-                      ? op_table['i_' + decoded[number_position + 4]]
+                    typeof this.op_table[
+                      'i_' + decoded[number_position + 4]
+                    ] !== 'undefined'
+                      ? this.op_table['i_' + decoded[number_position + 4]]
                       : parseInt(decoded[number_position + 4], 16);
                   mint_to_beneficiary_output -= 1;
                   if (
@@ -584,7 +1084,7 @@ export class Indexer {
                   );
                 } else if (
                   typeof decoded[number_position + 3] !== 'undefined' &&
-                  decoded[number_position + 3] !== op_table.b
+                  decoded[number_position + 3] !== this.op_table.b
                 ) {
                   return;
                 }
@@ -593,7 +1093,7 @@ export class Indexer {
 
                 if (
                   typeof decoded[number_position + 5] !== 'undefined' &&
-                  op_table.t === decoded[number_position + 5]
+                  this.op_table.t === decoded[number_position + 5]
                 ) {
                   traits = [];
 
@@ -622,7 +1122,7 @@ export class Indexer {
                   }
                 } else if (
                   typeof decoded[number_position + 5] !== 'undefined' &&
-                  op_table.tr === decoded[number_position + 5]
+                  this.op_table.tr === decoded[number_position + 5]
                 ) {
                   if (typeof decoded[number_position + 4] === 'undefined') {
                     return;
@@ -650,10 +1150,10 @@ export class Indexer {
                 }
 
                 // must be a taproot address
-                collection_address = Address.fromScriptPubKey([
-                  'OP_1',
-                  decoded[0],
-                ]);
+                collection_address = Address.fromScriptPubKey(
+                  ['OP_1', decoded[0]],
+                  network,
+                );
 
                 try {
                   await this.db.get('c_' + collection_address + '_' + num1);
@@ -667,16 +1167,18 @@ export class Indexer {
 
                     if (num2 > c_max) {
                       c_max = num2;
-                      await this.db.set('c_max_' + collection_address, num2);
+                      await this.db.put('c_max_' + collection_address, num2);
+                      await this._increaseMax(ticker, id, num2);
                     }
                   } catch (e) {
                     c_max = num2;
-                    await this.db.set('c_max_' + collection_address, num2);
+                    await this.db.put('c_max_' + collection_address, num2);
+                    await this._increaseMax(ticker, id, num2);
                   }
 
                   collection_number = num1;
 
-                  await this.db.set(
+                  await this.db.put(
                     'c_' + collection_address + '_' + num1,
                     JSON.stringify({
                       tick: ticker,
@@ -689,48 +1191,50 @@ export class Indexer {
                     }),
                   );
 
-                  //////
-
-                  const chunks = [];
-                  let started = false;
-                  let encoding = null;
-                  const ddd = Script.decode(tx.vin[0].txinwitness[1], false);
-
-                  for (const k in ddd) {
-                    if (started && encoding !== null && ddd[k] !== op_table.n) {
-                      chunks.push(ddd[k]);
+                  ////////////
+                  let chunks = []
+                  let started = false
+                  let encoding = null
+                  for (let k in decoded) {
+                    if (started && encoding !== null && decoded[k] !== this.op_table.n) {
+                      chunks.push(decoded[k])
                     }
                     if (encoding === null && started) {
-                      encoding = ddd[k];
+                      encoding = decoded[k]
                     }
-                    if (ddd[k] === op_table.i) {
-                      started = true;
+                    if (decoded[k] === this.op_table.i) {
+                      started = true
                     }
-                    if (ddd[k] === op_table.n) {
-                      started = false;
+                    if (decoded[k] === this.op_table.n) {
+                      started = false
                       break;
                     }
                   }
-                  const img = chunks.join('');
+                  const hex = chunks.join('')
+                  ////////////
 
-                  ///////
-
-                  this.logger.debug(`${ticker}:${id} was just deployed`);
-                  await this.service.saveNewToken({
+                  await this._updateDeployment({
                     ticker,
                     id,
-                    decimals,
-                    maxSupply: max,
-                    limit,
+                    colnum: num1,
+                    traits,
                     mime,
-                    metadata: img,
-                    block,
                     ref,
-                    collectionNumber: collection_number,
-                    collectionAddress: collection_address,
-                    txId: tx.txid,
+                    metadata: hex,
                   });
+
+                  /*
+                                  console.log({
+                                      tick : ticker,
+                                      id : id,
+                                      col : collection_address,
+                                      num : num1,
+                                      traits : traits,
+                                      mime : mime,
+                                      ref : ref
+                                  });*/
                 }
+
                 break;
               }
             } catch (e) {}
@@ -791,18 +1295,15 @@ export class Indexer {
               amt: _mint.toString(),
             };
 
-            this.logger.debug(`${ticker}:${id} was just minted on deploy`);
-            await this.service.updateTokenBalances(ticker, id, {
-              address: to_address,
-              balance: _mint,
-            });
-
             d.lim = d.lim.toString();
             d.rem = d.rem.toString();
             d.max = d.max.toString();
 
-            await this.db.set(utxo, JSON.stringify(_utxo));
-            await this.db.set('d_' + ticker + '_' + id, JSON.stringify(d));
+            await this.db.put(utxo, JSON.stringify(_utxo));
+            await this._addUtxo(tx.txid, mint_to_beneficiary_output, _utxo);
+
+            await this.db.put('d_' + ticker + '_' + id, JSON.stringify(d));
+            await this._saveDeployment(d);
 
             const address_amt =
               'a_' + mint_to_beneficiary_to_address + '_' + ticker + '_' + id;
@@ -810,318 +1311,30 @@ export class Indexer {
             try {
               let amt = await this.db.get(address_amt);
               amt = BigInt(amt) + _mint;
-              await this.db.set(address_amt, amt.toString());
+              await this.db.put(address_amt, amt.toString());
+              await this._updateBalance(ticker, id, mint_to_beneficiary_to_address, amt.toString());
             } catch (e) {
-              await this.db.set(address_amt, _utxo.amt);
+              await this.db.put(address_amt, _utxo.amt);
+              await this._updateBalance(ticker, id, mint_to_beneficiary_to_address, _utxo.amt.toString());
             }
 
             _deployment.rem = d.rem.toString();
+
+            //console.log(await this.db.get(utxo));
           } catch (e) {
             this.logger.error(e);
           }
         }
 
-        await this.db.set(deployment, JSON.stringify(_deployment));
-        await this.db.set(
+        await this.db.put(deployment, JSON.stringify(_deployment));
+        await this._saveDeployment(_deployment);
+        await this.db.put(
           'da_' + to_address + '_' + ticker + '_' + id,
           deployment,
         );
+
+        //console.log(await this.db.get(deployment));
       }
     } catch (e) {}
-  }
-
-  async indexTransfer(
-    block: number,
-    blockhash: string,
-    vout: any,
-    tx: any,
-    res: any,
-    ops: any,
-  ) {
-    // op count must be uneven
-    if (ops.length % 2 === 0) return;
-
-    // must at least include a full quadruple
-    if (ops.length < 7) return;
-
-    // let's check for the amount of quadruples we got
-    const tuples_length = ops.length - 3;
-
-    // check for potential presence of all quadruples
-    if (tuples_length % 4 !== 0) return;
-
-    let utxos: any = [];
-    const outputs: any = [];
-
-    for (let i = 3; i < ops.length; i += 4) {
-      const hex = ops[i];
-      const base = 10;
-      const bn = BigInt('0x' + hex);
-      const int_ticker = BigInt(bn.toString(base));
-
-      const ticker = toString26(int_ticker);
-      if (ticker === '') return;
-
-      const id =
-        ops[i + 1].startsWith('OP_') &&
-        typeof op_table['i_' + ops[i + 1]] !== 'undefined'
-          ? op_table['i_' + ops[i + 1]]
-          : parseInt(ops[i + 1], 16);
-      if (isNaN(id) || id < 0 || id > 999999) return;
-
-      const output =
-        ops[i + 2].startsWith('OP_') &&
-        typeof op_table['i_' + ops[i + 2]] !== 'undefined'
-          ? op_table['i_' + ops[i + 2]]
-          : parseInt(ops[i + 2], 16);
-      if (isNaN(output) || output < 0) return;
-
-      let transfer;
-
-      if (block < this.legacy_block_end) {
-        if (isNaN(parseInt(hexToString(ops[i + 3])))) {
-          transfer = ops[i + 3];
-        } else {
-          transfer = hexToString(ops[i + 3]);
-        }
-      } else {
-        transfer = hexToString(ops[i + 3]);
-      }
-
-      if (transfer.startsWith('0') && !transfer.startsWith('0.')) return;
-      if (transfer.includes('.') && transfer.endsWith('0')) return;
-      if (transfer.endsWith('.')) return;
-
-      const deployment = await this.getDeployment(ticker, id);
-
-      if (deployment !== null) {
-        if (countDecimals(transfer) > deployment.dec) return;
-
-        transfer = resolveNumberString(transfer, deployment.dec);
-
-        const _total_limit = this.total_limit;
-        const _transfer = BigInt(transfer);
-
-        if (_transfer <= 0 || _transfer > _total_limit) return;
-
-        if (typeof res.vout[output] === 'undefined') return;
-        const res_vout = Script.decode(res.vout[output].scriptPubKey, false);
-        if (res_vout[0] === 'OP_RETURN') return;
-
-        try {
-          const to_address = Address.fromScriptPubKey(
-            res.vout[output].scriptPubKey,
-          );
-
-          const _utxo = {
-            addr: to_address,
-            txid: tx.txid,
-            vout: output,
-            tick: deployment.tick,
-            id: deployment.id,
-            amt: _transfer.toString(),
-          };
-
-          // outputs can only be used once or the transfer is invalid and tokens are lost
-          if (outputs.includes(output)) {
-            utxos = [];
-            break;
-          }
-
-          utxos.push(_utxo);
-          outputs.push(output);
-        } catch (e) {
-          this.logger.error(e);
-        }
-      }
-    }
-
-    if (utxos.length > 0) {
-      const token_count: SpentTokenCount = {};
-      const spent_token_count: SpentTokenCount = {};
-
-      for (let i = 0; i < res.vin.length; i++) {
-        try {
-          let spent_utxo = await this.db.get(
-            'spent_utxo_' + res.vin[i].txid + '_' + res.vin[i].vout,
-          );
-          spent_utxo = JSON.parse(spent_utxo);
-
-          const sig = spent_utxo.tick + '-' + spent_utxo.id;
-
-          if (typeof spent_token_count[sig] === 'undefined') {
-            spent_token_count[sig] = 0n;
-          }
-
-          spent_token_count[sig] += BigInt(spent_utxo.amt);
-        } catch (e) {}
-      }
-
-      for (let i = 0; i < utxos.length; i++) {
-        const sig = utxos[i].tick + '-' + utxos[i].id;
-
-        if (typeof token_count[sig] === 'undefined') {
-          token_count[sig] = 0n;
-        }
-
-        token_count[sig] += BigInt(utxos[i].amt);
-      }
-
-      for (const sig in spent_token_count) {
-        if (typeof token_count[sig] !== 'undefined') {
-          if (spent_token_count[sig] < token_count[sig]) {
-            // token count cannot exceed the spent count.
-            // invalid transfer.
-            return;
-          }
-        }
-      }
-
-      for (let i = 0; i < utxos.length; i++) {
-        const utxo = 'utxo_' + utxos[i].txid + '_' + utxos[i].vout;
-        const address_amt =
-          'a_' + utxos[i].addr + '_' + utxos[i].tick + '_' + utxos[i].id;
-
-        try {
-          let amt = await this.db.get(address_amt);
-          amt = BigInt(amt) + BigInt(utxos[i].amt);
-          await this.db.set(address_amt, amt.toString());
-          await this.db.set(utxo, JSON.stringify(utxos[i]));
-        } catch (e) {
-          await this.db.set(address_amt, utxos[i].amt);
-          await this.db.set(utxo, JSON.stringify(utxos[i]));
-        }
-
-        this.logger.debug(
-          `${utxos[i].tick}:${utxos[i].id} was just transferred`,
-        );
-        await this.service.updateTokenBalances(utxos[i].tick, utxos[i].id, {
-          address: utxos[i].addr,
-          balance: utxos[i].amt,
-        });
-      }
-    }
-  }
-
-  async indexMint(
-    block: number,
-    blockhash: string,
-    vout: any,
-    tx: any,
-    res: any,
-    ops: any,
-  ) {
-    if (ops.length !== 7) return;
-
-    const hex = ops[3];
-    const base = 10;
-    const bn = BigInt('0x' + hex);
-    const int_ticker = BigInt(bn.toString(base));
-
-    const ticker = toString26(int_ticker);
-    if (ticker === '') return;
-
-    const id =
-      ops[4].startsWith('OP_') && typeof op_table['i_' + ops[4]] !== 'undefined'
-        ? op_table['i_' + ops[4]]
-        : parseInt(ops[4], 16);
-    if (isNaN(id) || id < 0 || id > 999999) return;
-
-    const output =
-      ops[5].startsWith('OP_') && typeof op_table['i_' + ops[5]] !== 'undefined'
-        ? op_table['i_' + ops[5]]
-        : parseInt(ops[5], 16);
-    if (isNaN(output) || output < 0) return;
-
-    let mint;
-
-    if (block < this.legacy_block_end) {
-      if (isNaN(parseInt(hexToString(ops[6])))) {
-        mint = ops[6];
-      } else {
-        mint = hexToString(ops[6]);
-      }
-    } else {
-      mint = hexToString(ops[6]);
-    }
-
-    if (mint.startsWith('0') && !mint.startsWith('0.')) return;
-    if (mint.includes('.') && mint.endsWith('0')) return;
-    if (mint.endsWith('.')) return;
-
-    const deployment = await this.getDeployment(ticker, id);
-
-    if (deployment !== null) {
-      if (countDecimals(mint) > deployment.dec) return;
-
-      deployment.lim = BigInt(deployment.lim);
-      deployment.rem = BigInt(deployment.rem);
-
-      mint = resolveNumberString(mint, deployment.dec);
-
-      const _total_limit = this.total_limit;
-      let _mint = BigInt(mint);
-
-      if (_mint <= 0 || _mint > _total_limit) return;
-
-      if (typeof res.vout[output] === 'undefined') return;
-      const res_vout = Script.decode(res.vout[output].scriptPubKey, false);
-      if (res_vout[0] === 'OP_RETURN') return;
-
-      if (deployment.rem === 0n) return;
-      if (
-        _mint <= 0n ||
-        _mint > deployment.lim ||
-        deployment.lim > deployment.max
-      )
-        return;
-
-      if (deployment.rem - _mint < 0n) {
-        _mint = deployment.rem;
-      }
-
-      deployment.rem -= _mint;
-      deployment.lim = deployment.lim.toString();
-      deployment.rem = deployment.rem.toString();
-
-      try {
-        const to_address = Address.fromScriptPubKey(
-          res.vout[output].scriptPubKey,
-        );
-        const utxo = 'utxo_' + tx.txid + '_' + output;
-
-        const _utxo = {
-          addr: to_address,
-          txid: tx.txid,
-          vout: output,
-          tick: deployment.tick,
-          id: deployment.id,
-          amt: _mint.toString(),
-        };
-
-        this.logger.debug(
-          `${deployment.tick}:${deployment.id} was just minted`,
-        );
-        await this.service.updateTokenBalances(deployment.tick, id, {
-          address: to_address,
-          balance: _mint,
-        });
-
-        await this.db.set(utxo, JSON.stringify(_utxo));
-        await this.db.set('d_' + ticker + '_' + id, JSON.stringify(deployment));
-
-        const address_amt = 'a_' + to_address + '_' + ticker + '_' + id;
-
-        try {
-          let amt = await this.db.get(address_amt);
-          amt = BigInt(amt) + _mint;
-          await this.db.set(address_amt, amt.toString());
-        } catch (e) {
-          await this.db.set(address_amt, _utxo.amt);
-        }
-      } catch (e) {
-        this.logger.error(e);
-      }
-    }
   }
 }

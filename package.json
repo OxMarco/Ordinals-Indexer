@@ -40,6 +40,7 @@
     "cache-manager": "^5.2.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "crypto": "^1.0.1",
     "discord.js": "^14.13.0",
     "level": "^8.0.0",
     "mongoose": "^7.6.2",
@@ -49,8 +50,7 @@
     "reflect-metadata": "^0.1.13",
     "rpc-bitcoin": "^2.0.0",
     "rxjs": "^7.2.0",
-    "util": "^0.12.5",
-    "web3.storage": "^4.5.5"
+    "util": "^0.12.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^9.0.0",

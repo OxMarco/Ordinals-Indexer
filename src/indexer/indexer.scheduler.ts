@@ -19,6 +19,7 @@ export class IndexScheduler implements OnModuleDestroy {
       indexerService,
     );
 
+    this.logger.log('Starting the cronjob');
     this.running = false;
   }
 
@@ -27,6 +28,7 @@ export class IndexScheduler implements OnModuleDestroy {
     if (this.running) return;
 
     const { run, latest } = await this.indexer.mustIndex();
+    this.indexerService.latestBlock = latest + 1;
     if (run) {
       await this.runIndexing(latest + 1);
     }
@@ -38,16 +40,14 @@ export class IndexScheduler implements OnModuleDestroy {
     const res = await this.indexer.index(block);
     if (res == IndexerErrors.REORG) {
       await this.indexer.cleanup(block - 8, block);
-      for (let i = block - 8; i <= block; i++) {
-        await this.indexer.index(i);
-      }
+      this.indexerService.latestBlock = block - 8;
     }
-    this.indexerService.latestBlock = block;
 
     this.running = false;
   }
 
   async onModuleDestroy() {
+    this.logger.log('Cronjob stopped');
     await this.indexer.close();
   }
 }

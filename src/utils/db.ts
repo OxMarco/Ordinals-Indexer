@@ -16,8 +16,11 @@ export class LevelDbAdapter {
   }
 
   public async removeAll(block: number) {
-    for await (const key of this.levelDb.keys({ block })) {
-      await this.levelDb.del(key);
+    for await (let [key, value] of this.levelDb.iterator()) {
+      value = JSON.parse(value);
+      if(value.block === block) {
+        await this.levelDb.del(key);
+      }
     }
   }
 
@@ -30,7 +33,7 @@ export class LevelDbAdapter {
     }
   }
 
-  public async set(key: string, value: any) {
+  public async put(key: string, value: any) {
     if (!this.block) throw new Error('Block not set');
 
     return await this.levelDb.put(

@@ -5,13 +5,16 @@ export type TokenDocument = HydratedDocument<Token>;
 
 @Schema({ timestamps: true })
 export class Token {
-  @Prop({ required: false })
+  @Prop({ required: false, index: true })
   pid: number;
+
+  @Prop({ required: false })
+  beneficiaryAddress: string;
 
   @Prop({ required: true, index: true })
   ticker: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, index: true })
   id: number;
 
   @Prop({ required: true })
@@ -21,13 +24,16 @@ export class Token {
   maxSupply: number;
 
   @Prop({ required: true })
+  remaining: number;
+
+  @Prop({ required: true })
   limit: number;
 
-  @Prop({ required: true })
-  mime: string;
+  @Prop({ required: false })
+  mime?: string;
 
-  @Prop({ required: true })
-  metadata: string;
+  @Prop({ required: false })
+  metadata?: string;
 
   @Prop({ required: false })
   ref?: string;
@@ -35,17 +41,23 @@ export class Token {
   @Prop({ required: false })
   traits?: string;
 
-  @Prop({ required: true })
-  collectionNumber: number;
+  @Prop({ required: false })
+  collectionNumber?: number;
 
-  @Prop({ required: true, index: true })
-  collectionAddress: string;
+  @Prop({ required: false })
+  collectionAddress?: string;
 
   @Prop({ required: true })
   txId: string;
 
   @Prop({ required: true, index: true })
   block: number;
+
+  @Prop({ required: true })
+  bvo: number
+
+  @Prop({ required: true })
+  vo: number;
 
   @Prop({
     type: Map,

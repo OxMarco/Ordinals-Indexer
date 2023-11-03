@@ -11,12 +11,13 @@ import {
 import { CacheInterceptor } from '@nestjs/cache-manager';
 import { Response } from 'express';
 import axios from 'axios';
+import { Pagination } from 'src/decorators/pagination';
 import { IndexerService } from './indexer.service';
 import { TokenEntity } from 'src/entities/token';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
 
 @Controller('indexer')
-@UseInterceptors(CacheInterceptor)
+//@UseInterceptors(CacheInterceptor)
 @MongooseClassSerializerInterceptor(TokenEntity)
 export class IndexerController {
   constructor(private readonly indexerService: IndexerService) {}
@@ -27,35 +28,20 @@ export class IndexerController {
   }
 
   @Get('/')
-  async getAll() {
-    const tokens = await this.indexerService.getAll();
+  async getAll(@Pagination() pagination: any) {
+    const tokens = await this.indexerService.getAll(pagination);
     return tokens;
   }
 
   @Get('/search')
-  async searchByTicker(@Query('ticker') ticker: string) {
-    const tokens = await this.indexerService.findByTickerSimilarity(ticker);
+  async searchByTicker(@Query('ticker') ticker: string, @Pagination() pagination: any) {
+    const tokens = await this.indexerService.findByTickerSimilarity(ticker, pagination);
     return tokens;
   }
 
-  @Get('/supply/:ticker/:id')
-  async getTokenSupplyInfo(
-    @Param('ticker') ticker: string,
-    @Param('id') id: number,
-  ) {
-    const token = await this.indexerService.getTokenSupplyInfo(
-      ticker.toLowerCase(),
-      id,
-    );
-    if (!token) {
-      throw new NotFoundException({ error: 'token not found' });
-    }
-    return token;
-  }
-
   @Get('/by-ticker/:ticker')
-  async getByTicker(@Param('ticker') ticker: string) {
-    const tokens = await this.indexerService.getByTicker(ticker.toLowerCase());
+  async getByTicker(@Param('ticker') ticker: string, @Pagination() pagination: any) {
+    const tokens = await this.indexerService.getByTicker(ticker.toLowerCase(), pagination);
     return tokens;
   }
 
@@ -100,14 +86,14 @@ export class IndexerController {
   }
 
   @Get('/by-block/:block')
-  async getByBlock(@Param('block') block: number) {
-    const tokens = await this.indexerService.getByBlock(block);
+  async getByBlock(@Param('block') block: number, @Pagination() pagination: any) {
+    const tokens = await this.indexerService.getByBlock(block, pagination);
     return tokens;
   }
 
   @Get('balances/:address')
-  async getTokensByAddress(@Param('address') address: string) {
-    const tokens = await this.indexerService.getTokensByAddress(address);
+  async getTokensByAddress(@Param('address') address: string, @Pagination() pagination: any) {
+    const tokens = await this.indexerService.getTokensByAddress(address, pagination);
     return tokens;
   }
 

@@ -9,8 +9,8 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class IndexerService {
-  latestBlock = 0;
   private openai;
+  latestBlock = 0;
 
   constructor(
     @InjectModel(Token.name) private tokenModel: Model<Token>,
@@ -23,13 +23,35 @@ export class IndexerService {
     });
   }
 
+  getPaginationOptions(pagination: any) {
+    const { page, limit, rel } = pagination;
+
+    const options: {
+      limit?: number,
+      skip?: number,
+      sort?: object,
+    } = {};
+  
+    if (limit) {
+      options.limit = limit;
+      options.skip = page && page > 0 ? (page - 1) * limit : 0;
+    }
+  
+    if (rel) {
+      options.sort = { _id: rel === 'asc' ? 1 : -1 };
+    }
+  
+    return options;
+  }  
+
   getLatestBlock() {
     return this.latestBlock;
   }
 
-  async getAll() {
+  async getAll(pagination = null) {
     try {
-      const tokens = await this.tokenModel.find().exec();
+      const options = this.getPaginationOptions(pagination);
+      const tokens = await this.tokenModel.find({}, null, options).exec();
       return tokens;
     } catch (error) {
       throw new Error(error.message);
@@ -45,9 +67,10 @@ export class IndexerService {
     }
   }
 
-  async getByTicker(ticker: string) {
+  async getByTicker(ticker: string, pagination = null) {
     try {
-      const tokens = await this.tokenModel.find({ ticker }).exec();
+      const options = this.getPaginationOptions(pagination);
+      const tokens = await this.tokenModel.find({ ticker }, null, options).exec();
       return tokens;
     } catch (error) {
       throw new Error(error.message);
@@ -74,10 +97,10 @@ export class IndexerService {
     }
   }
 
-  async getTokensByAddress(address: string) {
+  async getTokensByAddress(address: string, pagination = null) {
     try {
       const userTokens: Token[] = [];
-      const tokens = await this.getAll();
+      const tokens = await this.getAll(pagination);
       for (const token of tokens) {
         if (BigInt(token.balances.get(address) || 0) > 0)
           userTokens.push(token);
@@ -97,9 +120,10 @@ export class IndexerService {
     }
   }
 
-  async getByBlock(block: number) {
+  async getByBlock(block: number, pagination = null) {
     try {
-      return await this.tokenModel.find({ block }).exec();
+      const options = this.getPaginationOptions(pagination);
+      return await this.tokenModel.find({ block }, null, options).exec();
     } catch (error) {
       throw new Error(error.message);
     }
@@ -114,52 +138,59 @@ export class IndexerService {
     }
   }
 
-  async getTokenSupplyInfo(ticker: string, id: number) {
+  async findByTickerSimilarity(ticker: string, pagination = null) {
     try {
-      const token = await this.tokenModel.findOne({ ticker, id }).exec();
-      if (!token) {
-        return null;
-      }
-
-      const balances = Array.from(token.balances.values());
-      const sum = balances.reduce(
-        (acc, balance) => acc + BigInt(balance),
-        BigInt(0),
-      );
-
-      return { total: BigInt(token.maxSupply), circulating: sum.toString() };
-    } catch (error) {
-      throw new Error(error.message);
-    }
-  }
-
-  async findByTickerSimilarity(ticker: string) {
-    try {
+      const options = this.getPaginationOptions(pagination);
       const regex = new RegExp(ticker, 'i');
-      return await this.tokenModel.find({ ticker: { $regex: regex } }).exec();
+      return await this.tokenModel.find({ ticker: { $regex: regex } }, null, options).exec();
     } catch (error) {
       throw new Error(error.message);
     }
   }
 
   async saveNewToken(token: Token) {
-    try {
-      const newToken = new this.tokenModel(token);
-      await newToken.save();
+    const existingToken = await this.tokenModel.findOne(token);
+    if (existingToken) {
+      console.log(`token ${token.ticker}:${token.id} already exists`);
+    }
 
-      const tokenCreatedEvent = new TokenCreatedEvent();
-      tokenCreatedEvent.ticker = newToken.ticker;
-      tokenCreatedEvent.id = newToken.id;
-      this.eventEmitter.emit('token.created', tokenCreatedEvent);
-    } catch (error) {
-      throw new Error(error.message);
+    const newToken = new this.tokenModel(token);
+    await newToken.save();
+
+    const tokenCreatedEvent = new TokenCreatedEvent();
+    tokenCreatedEvent.ticker = newToken.ticker;
+    tokenCreatedEvent.id = newToken.id;
+    this.eventEmitter.emit('token.created', tokenCreatedEvent);
+  }
+
+  async updateTokenData(
+    ticker: string,
+    id: number,
+    data: any
+  ) {
+    const token: any = await this.tokenModel
+    .findOne({
+      ticker,
+      id,
+    })
+    .exec();
+    if (token !== null) {
+      for (const key in data) {
+        if (data[key] != null) {
+          token[key] = data[key];
+        }
+      }
+
+      await token.save();
+    } else {
+      console.log(`token ${ticker}:${id} not found`);
     }
   }
 
   async updateTokenBalances(
     ticker: string,
     id: number,
-    values: { address: string; balance: bigint },
+    values: { address: string; newBalance: string },
   ) {
     const token = await this.tokenModel
       .findOne({
@@ -169,13 +200,10 @@ export class IndexerService {
       .exec();
     if (token !== null) {
       const address = values.address;
-      const currentBalance = BigInt(token.balances.get(address) || '0');
-      const newBalance = currentBalance + values.balance;
-
-      token.balances.set(address, newBalance.toString());
+      token.balances.set(address, values.newBalance);
       await token.save();
     } else {
-      throw new Error('token not found');
+      console.log(`token ${ticker}:${id} not found`);
     }
   }
 
@@ -183,6 +211,7 @@ export class IndexerService {
     try {
       await this.tokenModel.deleteMany({ block }).exec();
     } catch (error) {
+      console.log(error);
       throw new Error(error.message);
     }
   }

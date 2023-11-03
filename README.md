@@ -29,29 +29,6 @@ Contains the indexer peripheral logic:
 - Necord with discord.js
 - OpenAI lib
 
-## API Endpoints
-**General**
-- `[GET] /`
-  returns a standard response to check server status
-- `[POST] /upload`
-  returns the cid of the uploaded file to IPFS
-
-**Indexer**
-- `[GET] /indexer/block`
-  return latest block indexed
-- `[GET] /indexer/tokens`
-  returns a list of all tokens
-- `[GET] /indexer/get-token/:ticker`
-  returns all tokens with the given ticker
-- `[GET] /indexer/get-token/:ticker/:id`
-  returns the specific token data
-- `[GET] /indexer/balance/:ticker/:id/:address`
-  returns the balance of the given address for the given token
-- `[GET] /indexer/:address`
-  returns all the tokens held by the given address
-- `[GET] /indexer/token-metadata/:ticker/:id`
-  returns the metadata (image, html page or audio) of the given token
-
 ## ToDo
-- [ ] Pagination
-- [ ] Token not found error
+- [ ] Remove comments from caching
+- [ ] Test pagination

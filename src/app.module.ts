@@ -22,10 +22,10 @@ import { IndexerModule } from './indexer/indexer.module';
     ]),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
-    CacheModule.register({
+    /*CacheModule.register({
       ttl: 60 * 5, // time in seconds (5 minutes)
       isGlobal: true,
-    }),
+    }),*/
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

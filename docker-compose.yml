@@ -1,12 +1,14 @@
 version: '3.8'
 
 services:
-  nestjs-app:
-    container_name: nestjs-backend
+  nestjs:
+    image: "ubuntu:latest"
+    container_name: nestjs
     build: .
     ports:
       - "3000:3000"
     environment:
+      BITCOIN_NODE_URL: "${BITCOIN_NODE_URL}"
       DATABASE_URL: "mongodb://mongoadmin:mongopassword@mongo:27017/nestjsdb?authSource=admin"
       DATABASE_USER: "mongoadmin"
       DATABASE_PASSWORD: "mongopassword"
@@ -15,6 +17,8 @@ services:
       REDIS_USERNAME: "redisuser"
       REDIS_PASSWORD: "redispassword"
       REDIS_DB_NAME: "nestjsredis"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
     depends_on:
       mongo:
         condition: service_started

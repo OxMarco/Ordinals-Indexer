@@ -5,6 +5,9 @@ export class TokenEntity {
   pid: number;
 
   @Expose()
+  beneficiaryAddress: string;
+
+  @Expose()
   ticker: string;
 
   @Expose()
@@ -17,12 +20,15 @@ export class TokenEntity {
   maxSupply: number;
 
   @Expose()
+  remaining: number;
+
+  @Expose()
   limit: number;
 
-  @Exclude()
+  @Expose()
   mime: string;
 
-  @Exclude()
+  @Expose()
   metadata: string;
 
   @Expose()
@@ -32,16 +38,22 @@ export class TokenEntity {
   traits?: string;
 
   @Expose()
-  collectionNumber: number;
+  collectionNumber?: number;
 
   @Expose()
-  collectionAddress: string;
+  collectionAddress?: string;
 
   @Expose()
   txId: string;
 
   @Expose()
   block: number;
+
+  @Expose()
+  bvo: number
+
+  @Expose()
+  vo: number;
 
   @Exclude()
   balances: any;
