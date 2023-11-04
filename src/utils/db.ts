@@ -16,9 +16,9 @@ export class LevelDbAdapter {
   }
 
   public async removeAll(block: number) {
-    for await (let [key, value] of this.levelDb.iterator()) {
-      value = JSON.parse(value);
-      if(value.block === block) {
+    for await (const [key, val] of this.levelDb.iterator()) {
+      const value = JSON.parse(val);
+      if (value.block === block) {
         await this.levelDb.del(key);
       }
     }

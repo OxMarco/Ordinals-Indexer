@@ -50,7 +50,7 @@ export class TokenEntity {
   block: number;
 
   @Expose()
-  bvo: number
+  bvo: number;
 
   @Expose()
   vo: number;

@@ -1,13 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { EmbedBuilder } from 'discord.js';
 import { Context, Options, SlashCommand, SlashCommandContext } from 'necord';
-import { IndexerService } from './indexer.service';
+import { AppService } from '../app.service';
 import { TokenDto } from 'src/dtos/token';
 import { HelpRequestDto } from 'src/dtos/help-request';
+import { TokenService } from '../token/token.service';
+import { ConfigService } from '@nestjs/config';
+import OpenAI from 'openai';
 
 @Injectable()
-export class IndexerBot {
-  constructor(private indexerService: IndexerService) {}
+export class BotService {
+  private openai;
+
+  constructor(
+    private configService: ConfigService,
+    private tokenService: TokenService,
+  ) {
+    const key = this.configService.get<string>('OPENAI_API_KEY');
+    this.openai = new OpenAI({
+      apiKey: key,
+    });
+  }
+
+  async askChatGPT(text: string) {
+    const chatCompletion: OpenAI.Chat.ChatCompletion =
+      await this.openai.chat.completions.create({
+        messages: [{ role: 'user', content: text }],
+        model: 'gpt-3.5-turbo',
+      });
+    return chatCompletion.choices[0].message.content;
+  }
 
   @SlashCommand({ name: 'gm', description: 'GM Command' })
   public async onPingRequest(@Context() [interaction]: SlashCommandContext) {
@@ -31,7 +53,7 @@ export class IndexerBot {
     await interaction.reply({ content: response });
 
     try {
-      const response = await this.indexerService.askChatGPT(text);
+      const response = await this.askChatGPT(text);
       await interaction.editReply({ content: response });
     } catch (error) {
       await interaction.editReply({
@@ -45,7 +67,7 @@ export class IndexerBot {
     @Context() [interaction]: SlashCommandContext,
     @Options() { ticker, id }: TokenDto,
   ) {
-    const token = await this.indexerService.get(ticker, id);
+    const token = await this.tokenService.get(ticker, id);
     if (!token) {
       return interaction.reply({ content: `Token ${ticker}:${id} not found` });
     }

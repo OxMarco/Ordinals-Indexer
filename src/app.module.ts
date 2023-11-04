@@ -6,10 +6,13 @@ import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/cache-manager';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
+import { HttpModule } from '@nestjs/axios';
 import { NecordModule, NecordModuleOptions } from 'necord';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { IndexerModule } from './indexer/indexer.module';
+import { TokenModule } from './token/token.module';
+import { UtxoModule } from './utxo/utxo.module';
+import { BotModule } from './bot/bot.module';
 
 @Module({
   imports: [
@@ -22,10 +25,10 @@ import { IndexerModule } from './indexer/indexer.module';
     ]),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
-    /*CacheModule.register({
+    CacheModule.register({
       ttl: 60 * 5, // time in seconds (5 minutes)
       isGlobal: true,
-    }),*/
+    }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -55,7 +58,13 @@ import { IndexerModule } from './indexer/indexer.module';
         } as NecordModuleOptions),
       inject: [ConfigService],
     }),*/
-    IndexerModule,
+    HttpModule.register({
+      timeout: 5000,
+      maxRedirects: 5,
+    }),
+    TokenModule,
+    UtxoModule,
+    BotModule,
   ],
   controllers: [AppController],
   providers: [AppService],

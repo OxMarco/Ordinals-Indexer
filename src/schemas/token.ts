@@ -1,11 +1,11 @@
-import { Prop, Schema, SchemaFactory, raw } from '@nestjs/mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
 export type TokenDocument = HydratedDocument<Token>;
 
 @Schema({ timestamps: true })
 export class Token {
-  @Prop({ required: false, index: true })
+  @Prop({ required: true, index: true, unique: true })
   pid: number;
 
   @Prop({ required: false })
@@ -54,7 +54,7 @@ export class Token {
   block: number;
 
   @Prop({ required: true })
-  bvo: number
+  bvo: number;
 
   @Prop({ required: true })
   vo: number;

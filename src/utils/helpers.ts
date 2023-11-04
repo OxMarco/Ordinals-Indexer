@@ -1,3 +1,24 @@
+export function getPaginationOptions(pagination: any) {
+  const { page, limit, rel } = pagination;
+
+  const options: {
+    limit?: number;
+    skip?: number;
+    sort?: object;
+  } = {};
+
+  if (limit) {
+    options.limit = limit;
+    options.skip = page && page > 0 ? (page - 1) * limit : 0;
+  }
+
+  if (rel) {
+    options.sort = { _id: rel === 'asc' ? 1 : -1 };
+  }
+
+  return options;
+}
+
 export function cleanFloat(input: string) {
   // Check if the input contains a comma and remove it
   input = input.replace(/,/g, '');

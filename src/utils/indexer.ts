@@ -24,9 +24,12 @@ export const enum IndexerErrors {
 
 export class Indexer {
   private readonly logger: Logger;
+  private network: Networks;
+  private initial_block = 809600;
   private rpc;
   private db;
-  private service;
+  private tokenService;
+  private utxoService;
   private legacy_block_end = 810000;
   private total_limit = 18446744073709551615n;
 
@@ -94,24 +97,53 @@ export class Indexer {
     'video/webm',
   ];
 
-  constructor(url: string, service: any) {
+  constructor(
+    url: string,
+    tokenService: any,
+    utxoService: any,
+    network: Networks = 'main',
+  ) {
     this.logger = new Logger(Indexer.name);
-    this.service = service;
+    this.tokenService = tokenService;
+    this.utxoService = utxoService;
 
+    this.network = network;
     this.rpc = new RPC(url);
     this.db = new LevelDbAdapter('pipe_bin_db');
+
+    this.logger.log('Indexer started');
   }
 
-  async _addUtxo(address: string, txid: string, vout: number, amount: string, ticker: string, id: number) {
-    await this.service.addUtxo(address, txid, vout, amount, ticker, id);
+  async _addUtxo(
+    address: string,
+    txid: string,
+    vout: number,
+    amount: string,
+    ticker: string,
+    id: number,
+  ) {
+    await this.utxoService.addUtxo(address, txid, vout, amount, ticker, id);
+  }
+
+  async _removeUtxo(txid: string) {
+    await this.utxoService.markUtxoAsSpent(txid);
   }
 
   async _updateBalance(ticker: string, id: number, addr: any, balance: string) {
-    await this.service.updateTokenBalances(ticker, id, { address: addr, newBalance: balance });
+    await this.tokenService.updateTokenBalances(ticker, id, {
+      address: addr,
+      newBalance: balance,
+    });
   }
 
   async _saveDeployment(deployment: any) {
+    let pid = 0;
+    try {
+      pid = await this.db.get('pid');
+    } catch (e) {}
+
     const data = {
+      pid: pid + 1,
       ticker: deployment.tick,
       id: deployment.id,
       beneficiaryAddress: deployment.baddr,
@@ -125,9 +157,12 @@ export class Indexer {
       block: deployment.blck,
       bvo: deployment.bvo,
       vo: deployment.vo,
-    }
+    };
 
-    await this.service.saveNewToken(data);
+    await this.tokenService.saveNewToken(data);
+    await this.db.put('pid', pid + 1);
+
+    this.logger.debug(`Saved new token ${data.ticker}:${data.id}`);
   }
 
   async _updateDeployment(deployment: any) {
@@ -141,13 +176,13 @@ export class Indexer {
       metadata: deployment?.metadata,
       remaining: deployment?.rem,
       limit: deployment?.lim,
-    }
+    };
 
-    await this.service.updateTokenData(ticker, deployment.id, data);
+    await this.tokenService.updateTokenData(ticker, deployment.id, data);
   }
 
   async _increaseMax(ticker: string, id: number, max: string) {
-    await this.service.updateTokenData(ticker, id, { maxSupply: max + 1});
+    await this.tokenService.updateTokenData(ticker, id, { maxSupply: max + 1 });
   }
 
   async close() {
@@ -156,8 +191,6 @@ export class Indexer {
         await this.db.get('mrk');
       } catch (e) {
         await this.db.close();
-        this.db = undefined as any;
-        this.service = undefined;
         this.logger.log('Indexer closed');
         return;
       }
@@ -167,8 +200,7 @@ export class Indexer {
 
   async cleanup(fromBlock: number, toBlock: number) {
     for (let block = fromBlock; block <= toBlock; block++) {
-      console.log("Clean up block: "+block);
-      this.service.removeAll(block);
+      this.tokenService.removeAll(block);
       this.db.removeAll(block);
     }
   }
@@ -258,7 +290,7 @@ export class Indexer {
       if (info.blocks > latest) return { run: true, latest };
       return { run: false, latest };
     } catch (e) {
-      return { run: true, latest: 809607 };
+      return { run: true, latest: this.initial_block };
     }
   }
 
@@ -266,29 +298,29 @@ export class Indexer {
    * Main indexing function.
    * Calls DMT functions, depending on the op_return status.
    *
-   * @param network
+   * @param block
    * @returns {Promise<void>}
    */
-  async index(block: number, network: Networks = 'main') {
+  async index(block: number) {
     this.db.setBlock(block);
 
     try {
       try {
         const block_check = await this.db.get('bchk');
 
-        if (block_check === block) {
+        if (block_check >= block) {
           this.logger.warn('Block already analysed');
           return IndexerErrors.BLOCK_AREADY_ANALYSED;
         }
       } catch (e) {}
 
       try {
-        await this.db.get('reorg');
+        console.log(await this.db.get('reorg'));
         this.logger.warn('Reorg detected at block ' + (block - 1));
         return IndexerErrors.REORG;
       } catch (e) {}
 
-      if (block > 0) {
+      if (block > this.initial_block) {
         let prev_blockhash = await this.rpc.call('getblockhash', [block - 1]);
         prev_blockhash = prev_blockhash.trim();
 
@@ -301,7 +333,7 @@ export class Indexer {
         } catch (e) {}
       }
 
-    //  this.logger.debug(`Start indexing block ${block}`);
+      this.logger.debug(`Start indexing block ${block}`);
 
       const blockhash = await this.rpc.call('getblockhash', [block]);
       const tx = await this.rpc.call('getblock', [blockhash, 3]);
@@ -351,10 +383,16 @@ export class Indexer {
                   amt = 0n;
                 }
                 await this.db.put(address_amt, amt.toString());
-                await this._updateBalance(old_utxo.tick, old_utxo.id, old_utxo.addr, amt.toString());
+                await this._updateBalance(
+                  old_utxo.tick,
+                  old_utxo.id,
+                  old_utxo.addr,
+                  amt.toString(),
+                );
 
                 await this.db.put('spent_' + utxo, _utxo);
                 await this.db.del(utxo);
+                await this._removeUtxo(old_utxo.txid);
 
                 // in case needed later on to assign non-op_return transactions
                 const sig = old_utxo.tick + '_' + old_utxo.id;
@@ -399,7 +437,6 @@ export class Indexer {
                   tx.tx[i],
                   res,
                   decoded,
-                  network,
                 );
                 break;
               case this.op_table.m:
@@ -410,7 +447,6 @@ export class Indexer {
                   tx.tx[i],
                   res,
                   decoded,
-                  network,
                 );
                 break;
               case this.op_table.t:
@@ -421,7 +457,6 @@ export class Indexer {
                   tx.tx[i],
                   res,
                   decoded,
-                  network,
                 );
                 break;
             }
@@ -445,7 +480,7 @@ export class Indexer {
                   try {
                     const to_address = Address.fromScriptPubKey(
                       res.vout[j].scriptPubKey,
-                      network,
+                      this.network,
                     );
                     const utxo = 'utxo_' + tx.tx[i].txid + '_' + j;
                     const address_amt = 'a_' + to_address + '_' + sig;
@@ -473,18 +508,42 @@ export class Indexer {
                       let amt = await this.db.get(address_amt);
                       amt = BigInt(amt) + spent_token_count[sig];
                       await this.db.put(address_amt, amt.toString());
-                      await this._updateBalance(_utxo.tick, _utxo.id, to_address, amt.toString());
+                      await this._updateBalance(
+                        _utxo.tick,
+                        _utxo.id,
+                        to_address,
+                        amt.toString(),
+                      );
 
                       await this.db.put(utxo, JSON.stringify(_utxo));
-                      await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
+                      await this._addUtxo(
+                        _utxo.addr,
+                        _utxo.txid,
+                        _utxo.vout,
+                        _utxo.amt,
+                        _utxo.tick,
+                        _utxo.id,
+                      );
                     } catch (e) {
                       await this.db.put(
                         address_amt,
                         spent_token_count[sig].toString(),
                       );
-                      await this._updateBalance(_utxo.tick, _utxo.id, to_address, spent_token_count[sig].toString());
+                      await this._updateBalance(
+                        _utxo.tick,
+                        _utxo.id,
+                        to_address,
+                        spent_token_count[sig].toString(),
+                      );
                       await this.db.put(utxo, JSON.stringify(_utxo));
-                      await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
+                      await this._addUtxo(
+                        _utxo.addr,
+                        _utxo.txid,
+                        _utxo.vout,
+                        _utxo.amt,
+                        _utxo.tick,
+                        _utxo.id,
+                      );
                     }
 
                     break;
@@ -518,7 +577,6 @@ export class Indexer {
    * @param tx
    * @param res
    * @param ops
-   * @param network
    * @returns {Promise<void>}
    */
   async indexTransfer(
@@ -528,7 +586,6 @@ export class Indexer {
     tx: any,
     res: any,
     ops: string[],
-    network: Networks = 'main',
   ) {
     // op count must be uneven
     if (ops.length % 2 === 0) return;
@@ -556,15 +613,19 @@ export class Indexer {
 
       const id =
         ops[i + 1].startsWith('OP_') &&
-        typeof this.op_table['i_' + ops[i + 1] as keyof typeof this.op_table] !== 'undefined'
-          ? this.op_table['i_' + ops[i + 1] as keyof typeof this.op_table]
+        typeof this.op_table[
+          ('i_' + ops[i + 1]) as keyof typeof this.op_table
+        ] !== 'undefined'
+          ? this.op_table[('i_' + ops[i + 1]) as keyof typeof this.op_table]
           : parseInt(ops[i + 1], 16);
       if (isNaN(id) || id < 0 || id > 999999) return;
 
       const output =
         ops[i + 2].startsWith('OP_') &&
-        typeof this.op_table['i_' + ops[i + 2] as keyof typeof this.op_table] !== 'undefined'
-          ? this.op_table['i_' + ops[i + 2] as keyof typeof this.op_table]
+        typeof this.op_table[
+          ('i_' + ops[i + 2]) as keyof typeof this.op_table
+        ] !== 'undefined'
+          ? this.op_table[('i_' + ops[i + 2]) as keyof typeof this.op_table]
           : parseInt(ops[i + 2], 16);
       if (isNaN(output) || output < 0) return;
 
@@ -603,7 +664,7 @@ export class Indexer {
         try {
           const to_address = Address.fromScriptPubKey(
             res.vout[output].scriptPubKey,
-            network,
+            this.network,
           );
 
           const _utxo = {
@@ -692,18 +753,42 @@ export class Indexer {
           let amt = await this.db.get(address_amt);
           amt = BigInt(amt) + BigInt(utxos[i].amt);
           await this.db.put(address_amt, amt.toString());
-          await this._updateBalance(utxos[i].tick, utxos[i].id, utxos[i].addr, amt.toString());
+          await this._updateBalance(
+            utxos[i].tick,
+            utxos[i].id,
+            utxos[i].addr,
+            amt.toString(),
+          );
 
           await this.db.put(utxo, JSON.stringify(utxos[i]));
-          await this._addUtxo(utxos[i].addr, utxos[i].txid, utxos[i].vout, utxos[i].amt, utxos[i].tick, utxos[i].id);
+          await this._addUtxo(
+            utxos[i].addr,
+            utxos[i].txid,
+            utxos[i].vout,
+            utxos[i].amt,
+            utxos[i].tick,
+            utxos[i].id,
+          );
 
           //console.log('3rd push', utxos[i]);
         } catch (e) {
           await this.db.put(address_amt, utxos[i].amt);
-          await this._updateBalance(utxos[i].tick, utxos[i].id, utxos[i].addr, utxos[i].amt.toString());
+          await this._updateBalance(
+            utxos[i].tick,
+            utxos[i].id,
+            utxos[i].addr,
+            utxos[i].amt.toString(),
+          );
 
           await this.db.put(utxo, JSON.stringify(utxos[i]));
-          await this._addUtxo(utxos[i].addr, utxos[i].txid, utxos[i].vout, utxos[i].amt, utxos[i].tick, utxos[i].id);
+          await this._addUtxo(
+            utxos[i].addr,
+            utxos[i].txid,
+            utxos[i].vout,
+            utxos[i].amt,
+            utxos[i].tick,
+            utxos[i].id,
+          );
           //console.log('4th push', utxos[i]);
         }
       }
@@ -719,7 +804,6 @@ export class Indexer {
    * @param tx
    * @param res
    * @param ops
-   * @param network
    * @returns {Promise<void>}
    */
   async indexMint(
@@ -729,7 +813,6 @@ export class Indexer {
     tx: any,
     res: any,
     ops: any,
-    network: Networks = 'main',
   ) {
     if (ops.length !== 7) return;
 
@@ -809,7 +892,7 @@ export class Indexer {
       try {
         const to_address = Address.fromScriptPubKey(
           res.vout[output].scriptPubKey,
-          network,
+          this.network,
         );
         const utxo = 'utxo_' + tx.txid + '_' + output;
 
@@ -823,7 +906,14 @@ export class Indexer {
         };
 
         await this.db.put(utxo, JSON.stringify(_utxo));
-        await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
+        await this._addUtxo(
+          _utxo.addr,
+          _utxo.txid,
+          _utxo.vout,
+          _utxo.amt,
+          _utxo.tick,
+          _utxo.id,
+        );
 
         await this.db.put('d_' + ticker + '_' + id, JSON.stringify(deployment));
         await this._updateDeployment(deployment);
@@ -836,7 +926,12 @@ export class Indexer {
           await this._updateBalance(ticker, id, to_address, amt.toString());
         } catch (e) {
           await this.db.put(address_amt, _utxo.amt);
-          await this._updateBalance(ticker, id, to_address, _utxo.amt.toString());
+          await this._updateBalance(
+            ticker,
+            id,
+            to_address,
+            _utxo.amt.toString(),
+          );
         }
 
         //console.log(await this.db.get(utxo));
@@ -856,7 +951,6 @@ export class Indexer {
    * @param tx
    * @param res
    * @param ops
-   * @param network
    * @returns {Promise<void>}
    */
   async indexDeployment(
@@ -866,7 +960,6 @@ export class Indexer {
     tx: any,
     res: any,
     ops: any,
-    network: Networks = 'main',
   ) {
     try {
       if (ops.length !== 9) return;
@@ -950,7 +1043,7 @@ export class Indexer {
 
       const to_address = Address.fromScriptPubKey(
         res.vout[output].scriptPubKey,
-        network,
+        this.network,
       );
 
       const deployment = 'd_' + ticker + '_' + id;
@@ -1153,7 +1246,7 @@ export class Indexer {
                 // must be a taproot address
                 collection_address = Address.fromScriptPubKey(
                   ['OP_1', decoded[0]],
-                  network,
+                  this.network,
                 );
 
                 try {
@@ -1193,25 +1286,29 @@ export class Indexer {
                   );
 
                   ////////////
-                  let chunks = []
-                  let started = false
-                  let encoding = null
-                  for (let k in decoded) {
-                    if (started && encoding !== null && decoded[k] !== this.op_table.n) {
-                      chunks.push(decoded[k])
+                  const chunks = [];
+                  let started = false;
+                  let encoding = null;
+                  for (const k in decoded) {
+                    if (
+                      started &&
+                      encoding !== null &&
+                      decoded[k] !== this.op_table.n
+                    ) {
+                      chunks.push(decoded[k]);
                     }
                     if (encoding === null && started) {
-                      encoding = decoded[k]
+                      encoding = decoded[k];
                     }
                     if (decoded[k] === this.op_table.i) {
-                      started = true
+                      started = true;
                     }
                     if (decoded[k] === this.op_table.n) {
-                      started = false
+                      started = false;
                       break;
                     }
                   }
-                  const hex = chunks.join('')
+                  const hex = chunks.join('');
                   ////////////
 
                   await this._updateDeployment({
@@ -1288,7 +1385,7 @@ export class Indexer {
             const utxo = 'utxo_' + tx.txid + '_' + mint_to_beneficiary_output;
 
             const _utxo = {
-              addr: mint_to_beneficiary_to_address || "",
+              addr: mint_to_beneficiary_to_address || '',
               txid: tx.txid,
               vout: mint_to_beneficiary_output,
               tick: ticker,
@@ -1301,7 +1398,14 @@ export class Indexer {
             d.max = d.max.toString();
 
             await this.db.put(utxo, JSON.stringify(_utxo));
-            await this._addUtxo(_utxo.addr, _utxo.txid, _utxo.vout, _utxo.amt, _utxo.tick, _utxo.id);
+            await this._addUtxo(
+              _utxo.addr,
+              _utxo.txid,
+              _utxo.vout,
+              _utxo.amt,
+              _utxo.tick,
+              _utxo.id,
+            );
 
             await this.db.put('d_' + ticker + '_' + id, JSON.stringify(d));
             await this._saveDeployment(d);
@@ -1313,10 +1417,20 @@ export class Indexer {
               let amt = await this.db.get(address_amt);
               amt = BigInt(amt) + _mint;
               await this.db.put(address_amt, amt.toString());
-              await this._updateBalance(ticker, id, mint_to_beneficiary_to_address, amt.toString());
+              await this._updateBalance(
+                ticker,
+                id,
+                mint_to_beneficiary_to_address,
+                amt.toString(),
+              );
             } catch (e) {
               await this.db.put(address_amt, _utxo.amt);
-              await this._updateBalance(ticker, id, mint_to_beneficiary_to_address, _utxo.amt.toString());
+              await this._updateBalance(
+                ticker,
+                id,
+                mint_to_beneficiary_to_address,
+                _utxo.amt.toString(),
+              );
             }
 
             _deployment.rem = d.rem.toString();
