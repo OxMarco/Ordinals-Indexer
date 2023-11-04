@@ -25,7 +25,7 @@ export const enum IndexerErrors {
 export class Indexer {
   private readonly logger: Logger;
   private network: Networks;
-  private initial_block = 809607;
+  private initial_block = 809606;
   private rpc;
   private db;
   private tokenService;
