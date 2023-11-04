@@ -178,8 +178,7 @@ export class TokenService {
 
   async removeAll(block: number) {
     try {
-      const result = await this.tokenModel.deleteMany({ block }).exec();
-      this.logger.debug(`Deleted ${result.deletedCount} token records`);
+      await this.tokenModel.deleteMany({ block }).exec();
     } catch (error) {
       this.logger.error(error);
       throw new Error(error.message);

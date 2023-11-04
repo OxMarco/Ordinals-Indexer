@@ -203,6 +203,8 @@ export class Indexer {
       this.tokenService.removeAll(block);
       this.db.removeAll(block);
     }
+
+    await this.db.put('bchk', fromBlock);
   }
 
   async getLatestIndexedBlock() {
@@ -333,7 +335,7 @@ export class Indexer {
         } catch (e) {}
       }
 
-      this.logger.debug(`Start indexing block ${block}`);
+      this.logger.log(`Start indexing block ${block}`);
 
       const blockhash = await this.rpc.call('getblockhash', [block]);
       const tx = await this.rpc.call('getblock', [blockhash, 3]);
@@ -562,7 +564,7 @@ export class Indexer {
       await this.db.del('mrk');
     } catch (e) {}
 
-    this.logger.debug(`Done indexing block ${block}`);
+    this.logger.log(`Done indexing block ${block}`);
 
     return IndexerErrors.OK;
   }
