@@ -7,17 +7,29 @@ import {
   Post,
   UploadedFile,
 } from '@nestjs/common';
+import { ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  @ApiOperation({ summary: 'Return server status' })
+  @ApiResponse({
+    status: 200,
+    type: String,
+  })
   @Get()
   index() {
     return { message: 'ok', time: new Date().toISOString() };
   }
 
+  @ApiOperation({ summary: 'Upload a file to IPFS' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({
+    status: 200,
+    type: String,
+  })
   @Post('upload')
   async uploadFile(
     @Body() body: any,
@@ -27,7 +39,7 @@ export class AppController {
           fileType: 'jpeg',
         })
         .addMaxSizeValidator({
-          maxSize: 1000,
+          maxSize: 10000,
         })
         .build({
           errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -35,10 +47,7 @@ export class AppController {
     )
     file: Express.Multer.File,
   ) {
-    const cid = await this.appService.uploadFile(
-      file.originalname,
-      file.buffer,
-    );
+    const cid = await this.appService.uploadFile(file.buffer);
     return { message: cid };
   }
 }

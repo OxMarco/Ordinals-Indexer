@@ -25,13 +25,13 @@ export const enum IndexerErrors {
 export class Indexer {
   private readonly logger: Logger;
   private network: Networks;
-  private initial_block = 809600;
   private rpc;
   private db;
   private tokenService;
   private utxoService;
   private legacy_block_end = 810000;
   private total_limit = 18446744073709551615n;
+  block = 809607;
 
   private op_table: any = {
     p: '50',
@@ -114,6 +114,12 @@ export class Indexer {
     this.logger.log('Indexer started');
   }
 
+  async init() {
+    try {
+      this.block = await this.db.get('b');
+    } catch {}
+  }
+
   async _addUtxo(
     address: string,
     txid: string,
@@ -191,14 +197,15 @@ export class Indexer {
         await this.db.get('mrk');
       } catch (e) {
         await this.db.close();
-        this.logger.log('Indexer closed');
         return;
       }
       new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
 
-  async cleanup(fromBlock: number, toBlock: number) {
+  async cleanup() {
+    const toBlock = this.block;
+    const fromBlock = toBlock - 8;
     for (let block = fromBlock; block <= toBlock; block++) {
       this.tokenService.removeAll(block);
       this.db.removeAll(block);
@@ -207,8 +214,13 @@ export class Indexer {
     await this.db.put('bchk', fromBlock);
   }
 
-  async getLatestIndexedBlock() {
-    return await this.db.get('bchk');
+  async getChainBlock() {
+    try {
+      const info = await this.rpc.call('getblockchaininfo', []);
+      return info.blocks;
+    } catch (e) {}
+
+    return 0;
   }
 
   /**
@@ -286,14 +298,13 @@ export class Indexer {
   }
 
   async mustIndex() {
-    try {
-      const latest = await this.getLatestIndexedBlock();
-      const info = await this.rpc.call('getblockchaininfo', []);
-      if (info.blocks > latest) return { run: true, latest };
-      return { run: false, latest };
-    } catch (e) {
-      return { run: true, latest: this.initial_block };
+    const chain_block = await this.getChainBlock();
+
+    if (chain_block > this.block) {
+      return true;
     }
+
+    return false;
   }
 
   /**
@@ -303,14 +314,14 @@ export class Indexer {
    * @param block
    * @returns {Promise<void>}
    */
-  async index(block: number) {
-    this.db.setBlock(block);
+  async index() {
+    this.db.setBlock(this.block);
 
     try {
       try {
         const block_check = await this.db.get('bchk');
 
-        if (block_check >= block) {
+        if (block_check >= this.block) {
           this.logger.warn('Block already analysed');
           return IndexerErrors.BLOCK_AREADY_ANALYSED;
         }
@@ -318,12 +329,14 @@ export class Indexer {
 
       try {
         console.log(await this.db.get('reorg'));
-        this.logger.warn('Reorg detected at block ' + (block - 1));
+        this.logger.warn('Reorg detected at block ' + (this.block - 1));
         return IndexerErrors.REORG;
       } catch (e) {}
 
-      if (block > this.initial_block) {
-        let prev_blockhash = await this.rpc.call('getblockhash', [block - 1]);
+      if (this.block > 0) {
+        let prev_blockhash = await this.rpc.call('getblockhash', [
+          this.block - 1,
+        ]);
         prev_blockhash = prev_blockhash.trim();
 
         try {
@@ -335,13 +348,13 @@ export class Indexer {
         } catch (e) {}
       }
 
-      this.logger.log(`Start indexing block ${block}`);
+      this.logger.log(`Start indexing block ${this.block}`);
 
-      const blockhash = await this.rpc.call('getblockhash', [block]);
+      const blockhash = await this.rpc.call('getblockhash', [this.block]);
       const tx = await this.rpc.call('getblock', [blockhash, 3]);
 
       await this.db.put('mrk', '');
-      await this.db.put('bchk', block);
+      await this.db.put('bchk', this.block);
 
       for (let i = 0; i < tx.tx.length; i++) {
         try {
@@ -433,7 +446,7 @@ export class Indexer {
             switch (decoded[2]) {
               case this.op_table.d:
                 await this.indexDeployment(
-                  block,
+                  this.block,
                   blockhash,
                   op_return_vout,
                   tx.tx[i],
@@ -443,7 +456,7 @@ export class Indexer {
                 break;
               case this.op_table.m:
                 await this.indexMint(
-                  block,
+                  this.block,
                   blockhash,
                   op_return_vout,
                   tx.tx[i],
@@ -453,7 +466,7 @@ export class Indexer {
                 break;
               case this.op_table.t:
                 await this.indexTransfer(
-                  block,
+                  this.block,
                   blockhash,
                   op_return_vout,
                   tx.tx[i],
@@ -559,12 +572,17 @@ export class Indexer {
         } catch (e) {}
       }
 
-      await this.db.put('b', block);
+      await this.db.put('b', this.block);
       await this.db.put('bh', blockhash);
       await this.db.del('mrk');
     } catch (e) {}
 
-    this.logger.log(`Done indexing block ${block}`);
+    this.logger.log(`Done indexing block ${this.block}`);
+
+    if (await this.mustIndex()) {
+      this.block += 1;
+      await this.index();
+    }
 
     return IndexerErrors.OK;
   }

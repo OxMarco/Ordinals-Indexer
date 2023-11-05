@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Indexer, IndexerErrors } from 'src/utils/indexer';
@@ -6,7 +11,7 @@ import { TokenService } from './token.service';
 import { UtxoService } from 'src/utxo/utxo.service';
 
 @Injectable()
-export class IndexScheduler implements OnModuleDestroy {
+export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IndexScheduler.name);
   private indexer;
   private running;
@@ -26,28 +31,32 @@ export class IndexScheduler implements OnModuleDestroy {
     this.running = false;
   }
 
-  @Cron(CronExpression.EVERY_SECOND)
+  @Cron(CronExpression.EVERY_5_SECONDS)
   async handleCron() {
     if (this.running) return;
 
-    const { run, latest } = await this.indexer.mustIndex();
-    if (run) {
-      await this.runIndexing(latest + 1);
-    }
+    if (await this.indexer.mustIndex()) await this.runIndexing();
   }
 
-  async runIndexing(block: number) {
+  async runIndexing() {
     this.running = true;
 
-    const res = await this.indexer.index(block);
+    const res = await this.indexer.index();
     if (res == IndexerErrors.REORG) {
-      await this.indexer.cleanup(block - 8, block);
+      await this.indexer.cleanup();
+    } else if (res == IndexerErrors.BLOCK_AREADY_ANALYSED) {
+      this.indexer.block++;
     }
 
     this.running = false;
   }
 
+  async onModuleInit() {
+    await this.indexer.init();
+  }
+
   async onModuleDestroy() {
+    this.logger.log('Cronjob stopping...');
     await this.indexer.close();
     this.logger.log('Cronjob stopped');
   }

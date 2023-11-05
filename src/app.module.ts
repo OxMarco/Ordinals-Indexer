@@ -4,7 +4,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/cache-manager';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
 import { NecordModule, NecordModuleOptions } from 'necord';
@@ -24,7 +23,6 @@ import { BotModule } from './bot/bot.module';
       },
     ]),
     ScheduleModule.forRoot(),
-    EventEmitterModule.forRoot(),
     CacheModule.register({
       ttl: 60 * 5, // time in seconds (5 minutes)
       isGlobal: true,

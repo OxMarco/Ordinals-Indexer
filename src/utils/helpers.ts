@@ -13,7 +13,7 @@ export function getPaginationOptions(pagination: any) {
   }
 
   if (rel) {
-    options.sort = { _id: rel === 'asc' ? 1 : -1 };
+    options.sort = { createdAt: rel === 'asc' ? 1 : -1 };
   }
 
   return options;

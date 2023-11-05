@@ -1,5 +1,7 @@
 Dockerfile
 .dockerignore
+docker-compose.yml
+pipe_bin_db
 node_modules
 dist
 .env

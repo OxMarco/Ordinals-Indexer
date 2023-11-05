@@ -1,11 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import * as mongoose from 'mongoose';
 import { HydratedDocument } from 'mongoose';
-import { Token } from './token';
 
 export type UtxoDocument = HydratedDocument<Utxo>;
 
-@Schema({ timestamps: false })
+@Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class Utxo {
   @Prop({ required: true, index: true })
   address: string;
@@ -22,8 +20,11 @@ export class Utxo {
   @Prop({ required: true, default: false })
   spent: boolean;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Token' })
-  token: Token;
+  @Prop({ required: true, index: true })
+  ticker: string;
+
+  @Prop({ required: true, index: true })
+  id: number;
 }
 
 export const UtxoSchema = SchemaFactory.createForClass(Utxo);

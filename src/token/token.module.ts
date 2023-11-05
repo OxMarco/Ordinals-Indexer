@@ -4,8 +4,6 @@ import { Token, TokenSchema } from 'src/schemas/token';
 import { IndexScheduler } from './indexer.scheduler';
 import { TokenController } from './token.controller';
 import { TokenService } from './token.service';
-import { TokenCreatedListener } from 'src/events/token.listener';
-import { TokenGateway } from 'src/events/token.gateway';
 import { UtxoService } from 'src/utxo/utxo.service';
 import { Utxo, UtxoSchema } from 'src/schemas/utxo';
 
@@ -17,12 +15,6 @@ import { Utxo, UtxoSchema } from 'src/schemas/utxo';
     ]),
   ],
   controllers: [TokenController],
-  providers: [
-    IndexScheduler,
-    TokenService,
-    TokenCreatedListener,
-    TokenGateway,
-    UtxoService,
-  ],
+  providers: [IndexScheduler, TokenService, UtxoService],
 })
 export class TokenModule {}

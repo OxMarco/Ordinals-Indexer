@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EmbedBuilder } from 'discord.js';
 import { Context, Options, SlashCommand, SlashCommandContext } from 'necord';
-import { AppService } from '../app.service';
 import { TokenDto } from 'src/dtos/token';
 import { HelpRequestDto } from 'src/dtos/help-request';
 import { TokenService } from '../token/token.service';

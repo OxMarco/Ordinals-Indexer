@@ -25,12 +25,8 @@ export class LevelDbAdapter {
   }
 
   public async get(key: string) {
-    if (this.block > 0) {
-      const res = JSON.parse(await this.levelDb.get(key));
-      return res.value;
-    } else {
-      throw new Error('Block not set');
-    }
+    const res = JSON.parse(await this.levelDb.get(key));
+    return res.value;
   }
 
   public async put(key: string, value: any) {

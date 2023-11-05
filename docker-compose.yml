@@ -6,6 +6,8 @@ services:
     build: .
     ports:
       - "3000:3000"
+    stop_signal: SIGTERM
+    stop_grace_period: 200s
     environment:
       BITCOIN_NODE_URL: "${BITCOIN_NODE_URL}"
       DATABASE_URL: "mongodb://mongoadmin:mongopassword@mongo:27017/nestjsdb?authSource=admin"
