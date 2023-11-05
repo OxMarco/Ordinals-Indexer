@@ -9,14 +9,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { CacheInterceptor } from '@nestjs/cache-manager';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import axios from 'axios';
 import { Pagination } from 'src/decorators/pagination';
 import { TokenService } from './token.service';
 import { TokenEntity } from 'src/entities/token';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
-import { Token } from 'src/schemas/token';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @Controller('token')
 @UseInterceptors(CacheInterceptor)
