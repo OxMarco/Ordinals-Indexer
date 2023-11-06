@@ -18,6 +18,14 @@ export class UtxoService {
     return utxos;
   }
 
+  async getByToken(ticker: string, id: number, pagination: any) {
+    const options = getPaginationOptions(pagination);
+    const utxos = await this.utxoModel
+      .find({ ticker, id }, null, options)
+      .exec(); // @todo test
+    return utxos;
+  }
+
   async getByTxId(txid: string, pagination: any) {
     const options = getPaginationOptions(pagination);
     const utxos = await this.utxoModel
@@ -29,35 +37,5 @@ export class UtxoService {
   async getByTxidVout(txid: string, vout: number) {
     const utxo = await this.utxoModel.findOne({ txId: txid, vout }).exec();
     return utxo;
-  }
-
-  async addUtxo(
-    address: string,
-    txid: string,
-    vout: number,
-    amount: string,
-    ticker: string,
-    id: number,
-  ) {
-    const utxoData = {
-      address,
-      txId: txid,
-      vout,
-      amount,
-      ticker,
-      id,
-    };
-    const newUtxo = new this.utxoModel(utxoData);
-    await newUtxo.save();
-  }
-
-  async markUtxoAsSpent(txId: string) {
-    const utxo = await this.utxoModel.findOne({ txId }).exec();
-    if (utxo !== null) {
-      utxo.spent = true;
-      await utxo.save();
-    } else {
-      this.logger.error(`utxo with txId ${txId} not found`);
-    }
   }
 }

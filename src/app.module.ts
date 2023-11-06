@@ -12,9 +12,12 @@ import { AppService } from './app.service';
 import { TokenModule } from './token/token.module';
 import { UtxoModule } from './utxo/utxo.module';
 import { BotModule } from './bot/bot.module';
+import { IndexerModule } from './indexer/indexer.module';
+import { LevelDBModule } from './db/level.module';
 
 @Module({
   imports: [
+    LevelDBModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([
       {
@@ -63,6 +66,7 @@ import { BotModule } from './bot/bot.module';
     TokenModule,
     UtxoModule,
     BotModule,
+    IndexerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

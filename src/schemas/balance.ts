@@ -2,30 +2,21 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Token } from './token';
 
-export type UtxoDocument = HydratedDocument<Utxo>;
+export type BalanceDocument = HydratedDocument<Balance>;
 
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
-export class Utxo {
+export class Balance {
   @Prop({ required: true, index: true })
   address: string;
 
-  @Prop({ required: true, index: true })
-  txId: string;
-
   @Prop({ required: true })
-  vout: number;
-
-  @Prop({ required: true })
-  amount: string;
-
-  @Prop({ required: true, default: false })
-  spent: boolean;
-
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Token', required: true })
-  token: Token;
+  balance: string;
 
   @Prop({ required: true, index: true })
   block: number;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Token', required: true })
+  token: Token;
 }
 
-export const UtxoSchema = SchemaFactory.createForClass(Utxo);
+export const BalanceSchema = SchemaFactory.createForClass(Balance);

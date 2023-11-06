@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Exclude, Expose } from 'class-transformer';
+import { Expose } from 'class-transformer';
 
 export class TokenEntity {
   @ApiProperty()
@@ -28,10 +28,6 @@ export class TokenEntity {
 
   @ApiProperty()
   @Expose()
-  remaining: number;
-
-  @ApiProperty()
-  @Expose()
   limit: number;
 
   @ApiProperty()
@@ -48,7 +44,7 @@ export class TokenEntity {
 
   @ApiPropertyOptional()
   @Expose()
-  traits?: string;
+  traits?: string[];
 
   @ApiPropertyOptional()
   @Expose()
@@ -74,16 +70,9 @@ export class TokenEntity {
   @Expose()
   vo: number;
 
-  @Exclude()
-  balances: any;
-
   @ApiProperty()
   @Expose()
   createdAt: Date;
-
-  @ApiProperty()
-  @Expose()
-  updatedAt: Date;
 
   constructor(partial: Partial<TokenEntity>) {
     Object.assign(this, partial);

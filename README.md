@@ -55,3 +55,6 @@ Contains the indexer peripheral logic:
 ## ToDo
 - [ ] Remove comments from caching
 - [ ] Test pagination
+- [ ] Add pruning cron job to remaining
+- [ ] Add c_max to db
+- [ ] calculate remaining and balances using leveldb

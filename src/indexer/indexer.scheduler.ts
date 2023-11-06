@@ -7,24 +7,21 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Indexer, IndexerErrors } from 'src/utils/indexer';
-import { TokenService } from './token.service';
-import { UtxoService } from 'src/utxo/utxo.service';
+import { LevelDBService } from 'src/db/level.service';
 
 @Injectable()
 export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IndexScheduler.name);
   private indexer;
-  private running;
+  running;
 
   constructor(
+    private readonly leveldbService: LevelDBService,
     private configService: ConfigService,
-    private tokenService: TokenService,
-    private utxoService: UtxoService,
   ) {
     this.indexer = new Indexer(
       this.configService.get<string>('BITCOIN_NODE_URL') || '',
-      tokenService,
-      utxoService,
+      leveldbService,
     );
 
     this.logger.log('Cronjob started');
@@ -45,7 +42,7 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
     if (res == IndexerErrors.REORG) {
       await this.indexer.cleanup();
     } else if (res == IndexerErrors.BLOCK_AREADY_ANALYSED) {
-      this.indexer.block++;
+      this.indexer.block += 1;
     }
 
     this.running = false;

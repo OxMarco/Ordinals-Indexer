@@ -3,9 +3,9 @@ import { HydratedDocument } from 'mongoose';
 
 export type TokenDocument = HydratedDocument<Token>;
 
-@Schema({ timestamps: true })
+@Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class Token {
-  @Prop({ required: true, index: true, unique: true })
+  @Prop({ required: false })
   pid: number;
 
   @Prop({ required: false })
@@ -24,9 +24,6 @@ export class Token {
   maxSupply: number;
 
   @Prop({ required: true })
-  remaining: number;
-
-  @Prop({ required: true })
   limit: number;
 
   @Prop({ required: false })
@@ -39,7 +36,7 @@ export class Token {
   ref?: string;
 
   @Prop({ required: false })
-  traits?: string;
+  traits?: string[];
 
   @Prop({ required: false })
   collectionNumber?: number;
@@ -58,14 +55,6 @@ export class Token {
 
   @Prop({ required: true })
   vo: number;
-
-  @Prop({
-    type: Map,
-    of: { type: String },
-    default: { null: 0 },
-    required: true,
-  })
-  balances: Map<string, string>;
 }
 
 export const TokenSchema = SchemaFactory.createForClass(Token);

@@ -110,10 +110,10 @@ export class TokenController {
     @Param('id') id: number,
     @Param('address') address: string,
   ) {
-    const balance = await this.tokenService.getBalanceByAddress(
+    const balance = await this.tokenService.getBalance(
+      address.toLowerCase(),
       ticker.toLowerCase(),
       id,
-      address.toLowerCase(),
     );
     return balance;
   }
@@ -156,9 +156,8 @@ export class TokenController {
     @Param('address') address: string,
     @Pagination() pagination: any,
   ) {
-    const tokens = await this.tokenService.getTokensByAddress(
+    const tokens = await this.tokenService.getBalancesForAddress(
       address.toLowerCase(),
-      pagination,
     );
     return tokens;
   }
@@ -221,7 +220,6 @@ export class TokenController {
           throw new UnsupportedMediaTypeException({
             error: 'mime type not found',
           });
-          break;
       }
     } else {
       throw new NotFoundException({ error: 'token not found' });

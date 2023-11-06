@@ -1,20 +1,20 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Token, TokenSchema } from 'src/schemas/token';
-import { IndexScheduler } from './indexer.scheduler';
 import { TokenController } from './token.controller';
 import { TokenService } from './token.service';
-import { UtxoService } from 'src/utxo/utxo.service';
-import { Utxo, UtxoSchema } from 'src/schemas/utxo';
+import { Token, TokenSchema } from 'src/schemas/token';
+import { Balance, BalanceSchema } from 'src/schemas/balance';
+import { Remaining, RemainingSchema } from 'src/schemas/remaining';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: Utxo.name, schema: UtxoSchema },
       { name: Token.name, schema: TokenSchema },
+      { name: Balance.name, schema: BalanceSchema },
+      { name: Remaining.name, schema: RemainingSchema },
     ]),
   ],
   controllers: [TokenController],
-  providers: [IndexScheduler, TokenService, UtxoService],
+  providers: [TokenService],
 })
 export class TokenModule {}

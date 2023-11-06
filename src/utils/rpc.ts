@@ -2,9 +2,11 @@ import axios from 'axios';
 
 export class RPC {
   private rpcEndpoint;
+  private logger;
 
-  constructor(rpcEndpoint: string) {
+  constructor(rpcEndpoint: string, logger: any) {
     this.rpcEndpoint = rpcEndpoint;
+    this.logger = logger;
   }
 
   async call(method: string, params: any[] = []) {
@@ -19,13 +21,22 @@ export class RPC {
       headers: {
         'Content-Type': 'application/json',
       },
+      timeout: 5000,
     };
 
-    try {
-      const response = await axios.post(this.rpcEndpoint, payload, config);
-      return response.data.result;
-    } catch (error) {
-      throw new Error('RPC Command Failed');
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await axios.post(this.rpcEndpoint, payload, config);
+        return response.data.result;
+      } catch (error) {
+        if (attempt === 2) {
+          this.logger.error(
+            `RPC Command Failed: ${method} ${JSON.stringify(params)}`,
+          );
+          return null;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
   }
 }

@@ -1,3 +1,7 @@
+export async function sleep(seconds: number) {
+  new Promise((resolve) => setTimeout(resolve, seconds));
+}
+
 export function getPaginationOptions(pagination: any) {
   const { page, limit, rel } = pagination;
 

@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Address, Networks, Script, Tx } from '@cmdcode/tapscript';
 import { RPC } from 'src/utils/rpc';
 import {
@@ -8,9 +8,9 @@ import {
   hexToBytes,
   hexToString,
   resolveNumberString,
+  sleep,
   toString26,
 } from './helpers';
-import { LevelDbAdapter } from 'src/utils/db';
 
 type SpentTokenCount = {
   [key: string]: bigint;
@@ -22,13 +22,12 @@ export const enum IndexerErrors {
   OK,
 }
 
+@Injectable()
 export class Indexer {
   private readonly logger: Logger;
   private network: Networks;
   private rpc;
   private db;
-  private tokenService;
-  private utxoService;
   private legacy_block_end = 810000;
   private total_limit = 18446744073709551615n;
   block = 809607;
@@ -99,17 +98,14 @@ export class Indexer {
 
   constructor(
     url: string,
-    tokenService: any,
-    utxoService: any,
+    leveldbService: any,
     network: Networks = 'main',
   ) {
     this.logger = new Logger(Indexer.name);
-    this.tokenService = tokenService;
-    this.utxoService = utxoService;
+    this.rpc = new RPC(url, this.logger);
 
     this.network = network;
-    this.rpc = new RPC(url);
-    this.db = new LevelDbAdapter('pipe_bin_db');
+    this.db = leveldbService;
 
     this.logger.log('Indexer started');
   }
@@ -120,77 +116,6 @@ export class Indexer {
     } catch {}
   }
 
-  async _addUtxo(
-    address: string,
-    txid: string,
-    vout: number,
-    amount: string,
-    ticker: string,
-    id: number,
-  ) {
-    await this.utxoService.addUtxo(address, txid, vout, amount, ticker, id);
-  }
-
-  async _removeUtxo(txid: string) {
-    await this.utxoService.markUtxoAsSpent(txid);
-  }
-
-  async _updateBalance(ticker: string, id: number, addr: any, balance: string) {
-    await this.tokenService.updateTokenBalances(ticker, id, {
-      address: addr,
-      newBalance: balance,
-    });
-  }
-
-  async _saveDeployment(deployment: any) {
-    let pid = 0;
-    try {
-      pid = await this.db.get('pid');
-    } catch (e) {}
-
-    const data = {
-      pid: pid + 1,
-      ticker: deployment.tick,
-      id: deployment.id,
-      beneficiaryAddress: deployment.baddr,
-      decimals: deployment.dec,
-      maxSupply: deployment.max,
-      remaining: deployment.rem,
-      limit: deployment.lim,
-      collectionNumber: deployment.colnum,
-      collectionAddress: deployment.col,
-      txId: deployment.tx,
-      block: deployment.blck,
-      bvo: deployment.bvo,
-      vo: deployment.vo,
-    };
-
-    await this.tokenService.saveNewToken(data);
-    await this.db.put('pid', pid + 1);
-
-    this.logger.debug(`Saved new token ${data.ticker}:${data.id}`);
-  }
-
-  async _updateDeployment(deployment: any) {
-    const ticker = deployment?.tick || deployment.ticker;
-
-    const data = {
-      collectionNumber: deployment?.colnum,
-      traits: deployment?.traits,
-      mime: deployment?.mime,
-      ref: deployment?.ref,
-      metadata: deployment?.metadata,
-      remaining: deployment?.rem,
-      limit: deployment?.lim,
-    };
-
-    await this.tokenService.updateTokenData(ticker, deployment.id, data);
-  }
-
-  async _increaseMax(ticker: string, id: number, max: string) {
-    await this.tokenService.updateTokenData(ticker, id, { maxSupply: max + 1 });
-  }
-
   async close() {
     while (true) {
       try {
@@ -199,7 +124,7 @@ export class Indexer {
         await this.db.close();
         return;
       }
-      new Promise((resolve) => setTimeout(resolve, 10));
+      await sleep(10);
     }
   }
 
@@ -207,10 +132,10 @@ export class Indexer {
     const toBlock = this.block;
     const fromBlock = toBlock - 8;
     for (let block = fromBlock; block <= toBlock; block++) {
-      this.tokenService.removeAll(block);
       this.db.removeAll(block);
     }
 
+    this.block = fromBlock;
     await this.db.put('bchk', fromBlock);
   }
 
@@ -348,7 +273,7 @@ export class Indexer {
         } catch (e) {}
       }
 
-      this.logger.log(`Start indexing block ${this.block}`);
+      this.logger.debug(`Start indexing block ${this.block}`);
 
       const blockhash = await this.rpc.call('getblockhash', [this.block]);
       const tx = await this.rpc.call('getblock', [blockhash, 3]);
@@ -398,16 +323,8 @@ export class Indexer {
                   amt = 0n;
                 }
                 await this.db.put(address_amt, amt.toString());
-                await this._updateBalance(
-                  old_utxo.tick,
-                  old_utxo.id,
-                  old_utxo.addr,
-                  amt.toString(),
-                );
-
                 await this.db.put('spent_' + utxo, _utxo);
                 await this.db.del(utxo);
-                await this._removeUtxo(old_utxo.txid);
 
                 // in case needed later on to assign non-op_return transactions
                 const sig = old_utxo.tick + '_' + old_utxo.id;
@@ -523,42 +440,13 @@ export class Indexer {
                       let amt = await this.db.get(address_amt);
                       amt = BigInt(amt) + spent_token_count[sig];
                       await this.db.put(address_amt, amt.toString());
-                      await this._updateBalance(
-                        _utxo.tick,
-                        _utxo.id,
-                        to_address,
-                        amt.toString(),
-                      );
-
                       await this.db.put(utxo, JSON.stringify(_utxo));
-                      await this._addUtxo(
-                        _utxo.addr,
-                        _utxo.txid,
-                        _utxo.vout,
-                        _utxo.amt,
-                        _utxo.tick,
-                        _utxo.id,
-                      );
                     } catch (e) {
                       await this.db.put(
                         address_amt,
                         spent_token_count[sig].toString(),
                       );
-                      await this._updateBalance(
-                        _utxo.tick,
-                        _utxo.id,
-                        to_address,
-                        spent_token_count[sig].toString(),
-                      );
                       await this.db.put(utxo, JSON.stringify(_utxo));
-                      await this._addUtxo(
-                        _utxo.addr,
-                        _utxo.txid,
-                        _utxo.vout,
-                        _utxo.amt,
-                        _utxo.tick,
-                        _utxo.id,
-                      );
                     }
 
                     break;
@@ -577,11 +465,12 @@ export class Indexer {
       await this.db.del('mrk');
     } catch (e) {}
 
-    this.logger.log(`Done indexing block ${this.block}`);
+    this.logger.debug(`Done indexing block ${this.block}`);
 
     if (await this.mustIndex()) {
       this.block += 1;
       await this.index();
+      await sleep(1);
     }
 
     return IndexerErrors.OK;
@@ -773,42 +662,12 @@ export class Indexer {
           let amt = await this.db.get(address_amt);
           amt = BigInt(amt) + BigInt(utxos[i].amt);
           await this.db.put(address_amt, amt.toString());
-          await this._updateBalance(
-            utxos[i].tick,
-            utxos[i].id,
-            utxos[i].addr,
-            amt.toString(),
-          );
-
           await this.db.put(utxo, JSON.stringify(utxos[i]));
-          await this._addUtxo(
-            utxos[i].addr,
-            utxos[i].txid,
-            utxos[i].vout,
-            utxos[i].amt,
-            utxos[i].tick,
-            utxos[i].id,
-          );
 
           //console.log('3rd push', utxos[i]);
         } catch (e) {
           await this.db.put(address_amt, utxos[i].amt);
-          await this._updateBalance(
-            utxos[i].tick,
-            utxos[i].id,
-            utxos[i].addr,
-            utxos[i].amt.toString(),
-          );
-
           await this.db.put(utxo, JSON.stringify(utxos[i]));
-          await this._addUtxo(
-            utxos[i].addr,
-            utxos[i].txid,
-            utxos[i].vout,
-            utxos[i].amt,
-            utxos[i].tick,
-            utxos[i].id,
-          );
           //console.log('4th push', utxos[i]);
         }
       }
@@ -926,32 +785,15 @@ export class Indexer {
         };
 
         await this.db.put(utxo, JSON.stringify(_utxo));
-        await this._addUtxo(
-          _utxo.addr,
-          _utxo.txid,
-          _utxo.vout,
-          _utxo.amt,
-          _utxo.tick,
-          _utxo.id,
-        );
-
         await this.db.put('d_' + ticker + '_' + id, JSON.stringify(deployment));
-        await this._updateDeployment(deployment);
         const address_amt = 'a_' + to_address + '_' + ticker + '_' + id;
 
         try {
           let amt = await this.db.get(address_amt);
           amt = BigInt(amt) + _mint;
           await this.db.put(address_amt, amt.toString());
-          await this._updateBalance(ticker, id, to_address, amt.toString());
         } catch (e) {
           await this.db.put(address_amt, _utxo.amt);
-          await this._updateBalance(
-            ticker,
-            id,
-            to_address,
-            _utxo.amt.toString(),
-          );
         }
 
         //console.log(await this.db.get(utxo));
@@ -1015,6 +857,7 @@ export class Indexer {
 
       const ticker = toString26(int_ticker);
 
+      // check if token already exists
       if ((await this.getDeployment(ticker, id)) !== null) return;
 
       let max = '';
@@ -1069,7 +912,7 @@ export class Indexer {
       const deployment = 'd_' + ticker + '_' + id;
 
       try {
-        await this.db.get(deployment);
+        await this.db.get(deployment); // if it already exists
       } catch (e) {
         let collection_address = null;
         let collection_number = null;
@@ -1282,28 +1125,13 @@ export class Indexer {
                     if (num2 > c_max) {
                       c_max = num2;
                       await this.db.put('c_max_' + collection_address, num2);
-                      await this._increaseMax(ticker, id, num2);
                     }
                   } catch (e) {
                     c_max = num2;
                     await this.db.put('c_max_' + collection_address, num2);
-                    await this._increaseMax(ticker, id, num2);
                   }
 
                   collection_number = num1;
-
-                  await this.db.put(
-                    'c_' + collection_address + '_' + num1,
-                    JSON.stringify({
-                      tick: ticker,
-                      id: id,
-                      col: collection_address,
-                      num: num1,
-                      traits: traits,
-                      mime: mime,
-                      ref: ref,
-                    }),
-                  );
 
                   ////////////
                   const chunks = [];
@@ -1331,15 +1159,19 @@ export class Indexer {
                   const hex = chunks.join('');
                   ////////////
 
-                  await this._updateDeployment({
-                    ticker,
-                    id,
-                    colnum: num1,
-                    traits,
-                    mime,
-                    ref,
-                    metadata: hex,
-                  });
+                  await this.db.put(
+                    'c_' + collection_address + '_' + num1,
+                    JSON.stringify({
+                      tick: ticker,
+                      id: id,
+                      col: collection_address,
+                      num: num1,
+                      traits: traits,
+                      mime: mime,
+                      metadata: hex,
+                      ref: ref,
+                    }),
+                  );
 
                   /*
                                   console.log({
@@ -1418,17 +1250,7 @@ export class Indexer {
             d.max = d.max.toString();
 
             await this.db.put(utxo, JSON.stringify(_utxo));
-            await this._addUtxo(
-              _utxo.addr,
-              _utxo.txid,
-              _utxo.vout,
-              _utxo.amt,
-              _utxo.tick,
-              _utxo.id,
-            );
-
             await this.db.put('d_' + ticker + '_' + id, JSON.stringify(d));
-            await this._saveDeployment(d);
 
             const address_amt =
               'a_' + mint_to_beneficiary_to_address + '_' + ticker + '_' + id;
@@ -1437,20 +1259,8 @@ export class Indexer {
               let amt = await this.db.get(address_amt);
               amt = BigInt(amt) + _mint;
               await this.db.put(address_amt, amt.toString());
-              await this._updateBalance(
-                ticker,
-                id,
-                mint_to_beneficiary_to_address,
-                amt.toString(),
-              );
             } catch (e) {
               await this.db.put(address_amt, _utxo.amt);
-              await this._updateBalance(
-                ticker,
-                id,
-                mint_to_beneficiary_to_address,
-                _utxo.amt.toString(),
-              );
             }
 
             _deployment.rem = d.rem.toString();
@@ -1462,7 +1272,6 @@ export class Indexer {
         }
 
         await this.db.put(deployment, JSON.stringify(_deployment));
-        await this._saveDeployment(_deployment);
         await this.db.put(
           'da_' + to_address + '_' + ticker + '_' + id,
           deployment,

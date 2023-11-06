@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { LevelDBService } from 'src/db/level.service';
+import { Balance } from 'src/schemas/balance';
+import { Remaining } from 'src/schemas/remaining';
 import { Token } from 'src/schemas/token';
 import { getPaginationOptions } from 'src/utils/helpers';
 
@@ -8,7 +11,12 @@ import { getPaginationOptions } from 'src/utils/helpers';
 export class TokenService {
   private readonly logger: Logger;
 
-  constructor(@InjectModel(Token.name) private tokenModel: Model<Token>) {
+  constructor(
+    @InjectModel(Token.name) private tokenModel: Model<Token>,
+    @InjectModel(Remaining.name) private remainingModel: Model<Remaining>,
+    @InjectModel(Balance.name) private balanceModel: Model<Balance>,
+    private readonly leveldbService: LevelDBService,
+  ) {
     this.logger = new Logger(TokenService.name);
   }
 
@@ -30,25 +38,65 @@ export class TokenService {
   }
 
   async getByCollectionAddress(address: string) {
-    const tokens = await this.tokenModel
-      .find({ collectionAddress: address })
+    const token = await this.tokenModel
+      .findOne({ collectionAddress: address })
       .exec();
-    return tokens;
+    return token;
   }
 
-  async getBalanceByAddress(ticker: string, id: number, address: string) {
+  async getLatestBalanceByAddress(address: string, ticker: string, id: number) {
     const token = await this.tokenModel.findOne({ ticker, id }).exec();
-    return { balance: token?.balances.get(address) };
+    if (token != null) {
+      const record = await this.balanceModel
+        .findOne({ address, token: token._id })
+        .sort({ block: -1 }) // Sort by 'block' in descending order
+        .exec();
+      return record?.balance;
+    } else {
+      throw new Error(`Token ${ticker}:${id} not found`);
+    }
   }
 
-  async getTokensByAddress(address: string, pagination = null) {
-    const userTokens: Token[] = [];
-    const tokens = await this.getAll(pagination);
-    for (const token of tokens) {
-      if (BigInt(token.balances.get(address) || 0) > 0) userTokens.push(token);
-    }
+  async getBalancesForAddress(address: string) {
+    const balances = await this.balanceModel
+      .aggregate([
+        { $match: { address: address } },
+        {
+          $sort: { block: -1 },
+        },
+        {
+          $group: {
+            _id: '$token', // Group by token
+            block: { $first: '$block' }, // Take the first (highest) block from the sorted documents
+            balance: { $first: '$balance' }, // Take the balance from the document with the highest block
+            address: { $first: '$address' }, // Take the address from the document with the highest block
+          },
+        },
+        {
+          $lookup: {
+            from: 'tokens', // Assuming your tokens collection is named 'tokens'
+            localField: '_id',
+            foreignField: '_id',
+            as: 'tokenDetails',
+          },
+        },
+        {
+          $unwind: '$tokenDetails', // Unwind the tokenDetails since $lookup returns an array
+        },
+        {
+          $project: {
+            _id: 0, // Suppress the _id field
+            token: '$_id', // Include the token id
+            balance: 1, // Include the balance
+            block: 1, // Include the block
+            address: 1, // Include the address
+            tokenDetails: 1, // Include the joined token details
+          },
+        },
+      ])
+      .exec();
 
-    return userTokens;
+    return balances;
   }
 
   async getByPid(pid: number) {
@@ -73,57 +121,17 @@ export class TokenService {
       .exec();
   }
 
-  async saveNewToken(token: Token) {
-    const existingToken = await this.tokenModel.findOne(token);
-    if (existingToken) {
-      this.logger.error(`token ${token.ticker}:${token.id} already exists`);
-    }
-
-    const newToken = new this.tokenModel(token);
-    await newToken.save();
-  }
-
-  async updateTokenData(ticker: string, id: number, data: any) {
-    const token: any = await this.tokenModel
-      .findOne({
-        ticker,
-        id,
-      })
-      .exec();
-    if (token !== null) {
-      for (const key in data) {
-        if (data[key] != null) {
-          token[key] = data[key];
-        }
+  async getBalance(address: string, ticker: string, id: number) {
+    try {
+      const token = await this.get(ticker, id);
+      if (token !== null) {
+        const address_amt =
+          'a_' + address + '_' + ticker.toLowerCase() + '_' + id;
+        const amt = await this.leveldbService.get(address_amt);
+        return amt; // @todo consider returning decimals too
       }
+    } catch (e) {}
 
-      await token.save();
-    } else {
-      this.logger.error(`token ${ticker}:${id} not found`);
-    }
-  }
-
-  async updateTokenBalances(
-    ticker: string,
-    id: number,
-    values: { address: string; newBalance: string },
-  ) {
-    const token = await this.tokenModel
-      .findOne({
-        ticker,
-        id,
-      })
-      .exec();
-    if (token !== null) {
-      const address = values.address;
-      token.balances.set(address, values.newBalance);
-      await token.save();
-    } else {
-      this.logger.error(`token ${ticker}:${id} not found`);
-    }
-  }
-
-  async removeAll(block: number) {
-    await this.tokenModel.deleteMany({ block }).exec();
+    return 0;
   }
 }
