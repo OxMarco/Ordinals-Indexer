@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Token } from 'src/schemas/token';
 import { Utxo } from 'src/schemas/utxo';
 
 @Injectable()
-export class IndexerService {
+export class IndexerService implements OnModuleInit {
   private readonly logger: Logger;
+  private pid: number;
 
   constructor(
     @InjectModel(Token.name) private tokenModel: Model<Token>,
@@ -15,15 +16,20 @@ export class IndexerService {
     this.logger = new Logger(IndexerService.name);
   }
 
+  async onModuleInit() {
+    this.pid = await this.tokenModel.countDocuments().exec();
+  }
+
   async saveDeployment(token: Token) {
     try {
       const existingToken = await this.tokenModel
         .findOne({ ticker: token.ticker, id: token.id })
         .exec();
       if (!existingToken) {
-        token.pid = (await this.tokenModel.countDocuments().exec()) + 1;
+        token.pid = this.pid;
         const newToken = new this.tokenModel(token);
         await newToken.save();
+        this.pid += 1;
       } else {
         console.log(token);
         this.logger.error(
@@ -99,6 +105,7 @@ export class IndexerService {
     try {
       await this.tokenModel.deleteMany({ block }).exec();
       await this.utxoModel.deleteMany({ block }).exec();
+      this.pid = await this.tokenModel.countDocuments().exec();
     } catch (e) {
       this.logger.error(
         `Error occurred when removing tokens for block ${block}`,

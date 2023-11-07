@@ -466,7 +466,7 @@ export class Indexer {
     if (await this.mustIndex()) {
       this.block += 1;
       await this.index();
-      await sleep(1000);
+      await sleep(2000);
     }
 
     return IndexerErrors.OK;
