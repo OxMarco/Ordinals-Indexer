@@ -6,7 +6,6 @@ import { sleep } from 'src/utils/helpers';
 
 @Injectable()
 export class LevelDBService implements OnModuleDestroy {
-  private enableHooks: boolean;
   private block: number;
   private indexerService;
 
@@ -15,7 +14,6 @@ export class LevelDBService implements OnModuleDestroy {
     private readonly service: IndexerService,
   ) {
     this.indexerService = service;
-    this.enableHooks = true;
   }
 
   async onModuleDestroy() {
@@ -23,7 +21,6 @@ export class LevelDBService implements OnModuleDestroy {
       try {
         await this.db.get('mrk');
       } catch (e) {
-        this.enableHooks = false;
         await this.db.close();
         return;
       }
@@ -47,8 +44,6 @@ export class LevelDBService implements OnModuleDestroy {
   }
 
   private async _hook(key: string, value: string) {
-    if (!this.enableHooks) return;
-
     // Parse UTXO
     if (key.startsWith('utxo_')) {
       const parsedVal = JSON.parse(value);
