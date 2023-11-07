@@ -39,6 +39,10 @@ export class UtxoEntity {
   @Expose()
   createdAt: Date;
 
+  @ApiProperty()
+  @Expose()
+  updatedAt: Date;
+
   constructor(partial: Partial<UtxoEntity>) {
     Object.assign(this, partial);
   }

@@ -96,11 +96,7 @@ export class Indexer {
     'video/webm',
   ];
 
-  constructor(
-    url: string,
-    leveldbService: any,
-    network: Networks = 'main',
-  ) {
+  constructor(url: string, leveldbService: any, network: Networks = 'main') {
     this.logger = new Logger(Indexer.name);
     this.rpc = new RPC(url, this.logger);
 
@@ -470,7 +466,7 @@ export class Indexer {
     if (await this.mustIndex()) {
       this.block += 1;
       await this.index();
-      await sleep(1);
+      await sleep(1000);
     }
 
     return IndexerErrors.OK;

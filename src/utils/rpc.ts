@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { sleep } from './helpers';
 
 export class RPC {
   private rpcEndpoint;
@@ -35,7 +36,7 @@ export class RPC {
           );
           return null;
         }
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await sleep((attempt + 1) * 1000);
       }
     }
   }

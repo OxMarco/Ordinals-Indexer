@@ -32,6 +32,10 @@ export class TokenEntity {
 
   @ApiProperty()
   @Expose()
+  remaining: string;
+
+  @ApiProperty()
+  @Expose()
   mime: string;
 
   @ApiProperty()
@@ -73,6 +77,10 @@ export class TokenEntity {
   @ApiProperty()
   @Expose()
   createdAt: Date;
+
+  @ApiProperty()
+  @Expose()
+  updatedAt: Date;
 
   constructor(partial: Partial<TokenEntity>) {
     Object.assign(this, partial);

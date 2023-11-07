@@ -3,7 +3,7 @@ import { HydratedDocument } from 'mongoose';
 
 export type TokenDocument = HydratedDocument<Token>;
 
-@Schema({ timestamps: { createdAt: true, updatedAt: false } })
+@Schema({ timestamps: true })
 export class Token {
   @Prop({ required: false })
   pid: number;
@@ -25,6 +25,14 @@ export class Token {
 
   @Prop({ required: true })
   limit: number;
+
+  @Prop({
+    required: true,
+    default: function () {
+      return this.maxSupply;
+    },
+  })
+  remaining: number;
 
   @Prop({ required: false })
   mime?: string;

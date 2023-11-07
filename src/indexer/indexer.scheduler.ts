@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Indexer, IndexerErrors } from 'src/utils/indexer';
-import { LevelDBService } from 'src/db/level.service';
+import { LevelDBService } from 'src/leveldb/leveldb.service';
 
 @Injectable()
 export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
@@ -42,6 +42,7 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
     if (res == IndexerErrors.REORG) {
       await this.indexer.cleanup();
     } else if (res == IndexerErrors.BLOCK_AREADY_ANALYSED) {
+      // @todo handle this better
       this.indexer.block += 1;
     }
 
@@ -53,7 +54,6 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    this.logger.log('Cronjob stopping...');
     await this.indexer.close();
     this.logger.log('Cronjob stopped');
   }

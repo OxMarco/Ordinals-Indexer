@@ -152,10 +152,7 @@ export class TokenController {
     type: [TokenEntity],
   })
   @Get('balances/:address')
-  async getTokensByAddress(
-    @Param('address') address: string,
-    @Pagination() pagination: any,
-  ) {
+  async getTokensByAddress(@Param('address') address: string) {
     const tokens = await this.tokenService.getBalancesForAddress(
       address.toLowerCase(),
     );

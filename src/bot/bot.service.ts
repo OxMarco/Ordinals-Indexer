@@ -72,9 +72,9 @@ export class BotService {
     }
 
     const name = `Token ${ticker}:${id}`;
-    const description = `*MaxSupply*: ${token.maxSupply}
-    *Collection #*: ${token.collectionNumber}
-    *Collection address*: ${token.collectionAddress}
+    const description = `*Type*: ${token.collectionAddress ? 'Art' : 'Token'}
+    *MaxSupply*: ${token.maxSupply}
+    *Remaining #*: ${token.remaining}
     *Deployment block*: ${token.block}`;
 
     if (token?.mime && token.mime.includes('image'))
@@ -84,11 +84,11 @@ export class BotService {
             .setTitle(name)
             .setDescription(description)
             .setImage(
-              'http://localhost:3000/indexer/token-metadata/' +
+              'https://indexer.inspip.com/token/metadata/' +
                 token.ticker +
                 '/' +
                 token.id,
-            ), // @todo change to prod url
+            ),
         ],
       });
     else if (token?.ref) {

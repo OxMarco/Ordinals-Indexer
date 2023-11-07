@@ -4,7 +4,7 @@ import { Token } from './token';
 
 export type UtxoDocument = HydratedDocument<Utxo>;
 
-@Schema({ timestamps: { createdAt: true, updatedAt: false } })
+@Schema({ timestamps: true })
 export class Utxo {
   @Prop({ required: true, index: true })
   address: string;

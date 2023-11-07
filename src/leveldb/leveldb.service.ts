@@ -1,16 +1,34 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Level } from 'level';
 import { IndexerService } from 'src/indexer/indexer.service';
 import { Token } from 'src/schemas/token';
+import { sleep } from 'src/utils/helpers';
 
 @Injectable()
-export class LevelDBService {
+export class LevelDBService implements OnModuleDestroy {
+  private enableHooks: boolean;
   private block: number;
   private indexerService;
 
-  constructor(@Inject('LEVELDB_CONNECTION') private db: Level,
-  private readonly service: IndexerService) {
+  constructor(
+    @Inject('LEVELDB_CONNECTION') private db: Level,
+    private readonly service: IndexerService,
+  ) {
     this.indexerService = service;
+    this.enableHooks = true;
+  }
+
+  async onModuleDestroy() {
+    while (true) {
+      try {
+        await this.db.get('mrk');
+      } catch (e) {
+        this.enableHooks = false;
+        await this.db.close();
+        return;
+      }
+      await sleep(10);
+    }
   }
 
   public setBlock(block: number) {
@@ -29,6 +47,8 @@ export class LevelDBService {
   }
 
   private async _hook(key: string, value: string) {
+    if (!this.enableHooks) return;
+
     // Parse UTXO
     if (key.startsWith('utxo_')) {
       const parsedVal = JSON.parse(value);
@@ -40,18 +60,21 @@ export class LevelDBService {
         txid: parts[2],
         vout: parseInt(parts[3]),
       };
-      await this.indexerService.markUtxoAsSpent(data.txid, data.vout);
+      await this.indexerService.markUtxoAsSpent(
+        data.txid,
+        data.vout,
+        this.block,
+      );
       // Parse deployment
     } else if (key.startsWith('d_')) {
       const parsedVal = JSON.parse(value);
       try {
         await this.db.get(key);
-        // deployment already exists, it's an update
+        // deployment exists, it's an update
         await this.indexerService.updateRemaining(
           parsedVal.tick,
           parsedVal.id,
           parsedVal.rem,
-          this.block,
         );
       } catch {
         // deployment does not exist, it's a new deployment
@@ -63,6 +86,7 @@ export class LevelDBService {
           decimals: parsedVal?.dec,
           maxSupply: parsedVal?.max,
           limit: parsedVal?.lim,
+          remaining: parsedVal?.rem,
           collectionNumber: parsedVal?.colnum,
           collectionAddress: parsedVal?.col,
           txId: parsedVal?.tx,
@@ -78,20 +102,6 @@ export class LevelDBService {
       }
     } else if (key.startsWith('a_')) {
       // Update user balance
-      const parts = key.split('_');
-      const data = {
-        balance: value,
-        address: parts[1],
-        ticker: parts[2],
-        id: parseInt(parts[3]),
-      };
-      this.indexerService.updateBalance(
-        data.ticker,
-        data.id,
-        data.address,
-        data.balance,
-        this.block,
-      );
     } else if (key.startsWith('c_max_')) {
       console.log('collectible max update');
     }
@@ -105,7 +115,7 @@ export class LevelDBService {
   public async put(key: string, value: any) {
     if (!this.block) throw new Error('Block not set');
 
-    if(this.block > 0) this._hook(key, value);
+    if (this.block > 0) this._hook(key, value);
 
     return await this.db.put(key, JSON.stringify({ block: this.block, value }));
   }

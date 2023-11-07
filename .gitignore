@@ -38,4 +38,4 @@ lerna-debug.log*
 .env
 
 # db
-pipe_bin_db/
+pipe_db/
