@@ -3,7 +3,9 @@ import { HydratedDocument } from 'mongoose';
 
 export type UtxoDocument = HydratedDocument<Utxo>;
 
-@Schema({ timestamps: true })
+@Schema({ 
+  timestamps: { createdAt: true, updatedAt: false } 
+})
 export class Utxo {
   @Prop({ required: true, index: true })
   address: string;

@@ -68,18 +68,14 @@ export class IndexerService implements OnModuleInit {
   async deleteUtxo(txId: string, vout: number) {
     try {
       const utxo = await this.utxoModel.findOneAndDelete({ txId, vout }).exec();
-      if (utxo) {
-        this.logger.log(
-          `UTXO with txId: ${txId} and vout: ${vout} deleted successfully.`,
-        );
-      } else {
+      if (!utxo) {
         this.logger.error(
-          `UTXO with txId ${txId} and vout: ${vout} not found.`,
+          `UTXO with txId ${txId} and vout ${vout} not found.`,
         );
       }
     } catch (e) {
       this.logger.error(
-        `Error occurred when deleting UTXO with txId ${txId} and vout: ${vout}.`,
+        `Error occurred when deleting UTXO with txId ${txId} and vout ${vout}.`,
       );
       this.logger.error(e);
     }

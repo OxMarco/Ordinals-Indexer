@@ -116,8 +116,8 @@ export class Indexer {
 
   async init() {
     try {
-      this.logger.log('Indexer started');
-      this.block = (await this.db.get('b')) + 1;
+      this.logger.log("Indexer started");
+      this.block = await this.db.get('b') + 1;
     } catch {}
   }
 
@@ -278,6 +278,8 @@ export class Indexer {
           }
         } catch (e) {}
       }
+
+      this.logger.debug(`Start indexing block ${this.block}`);
 
       const blockhash = await this.rpc.call('getblockhash', [this.block]);
       const tx = await this.rpc.call('getblock', [blockhash, 3]);
