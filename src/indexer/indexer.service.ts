@@ -23,8 +23,6 @@ export class IndexerService implements OnModuleInit {
   }
 
   async saveOrUpdateToken(tokenData: any) {
-    console.log('saveOrUpdateToken');
-
     try {
       const existingToken = await this.tokenModel
         .findOne({ ticker: tokenData.ticker, id: tokenData.id })
@@ -34,12 +32,10 @@ export class IndexerService implements OnModuleInit {
         existingToken.remaining =
           tokenData.remaining ?? existingToken.remaining;
         await existingToken.save();
-        this.logger.log(`Token ${tokenData.ticker}:${tokenData.id} updated.`);
       } else {
         tokenData.pid = this.pid;
         const newToken = new this.tokenModel(tokenData);
         await newToken.save();
-        this.logger.log(`Token ${tokenData.ticker}:${tokenData.id} created.`);
         this.pid += 1;
       }
     } catch (e) {
@@ -57,7 +53,8 @@ export class IndexerService implements OnModuleInit {
         txId: data.txid,
         vout: data.vout,
         amount: data.amt,
-        spent: false,
+        ticker: data.tick,
+        id: data.id,
         block: block,
       };
       const newUtxo = new this.utxoModel(utxo);

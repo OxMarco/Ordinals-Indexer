@@ -67,13 +67,13 @@ export class LevelDBAdapter {
       // Parse deployment
     } else if (key.startsWith('d_')) {
       const parsedVal = JSON.parse(value);
-      this._saveToken(parsedVal);
+      await this._saveToken(parsedVal);
     } else if (key.startsWith('a_')) {
     } else if (key.startsWith('c_max_')) {
     } else if (key.startsWith('c_')) {
       // new art deployment
       const parsedVal = JSON.parse(value);
-      this._saveToken(parsedVal);
+      await this._saveToken(parsedVal);
     }
   }
 
@@ -85,7 +85,7 @@ export class LevelDBAdapter {
   public async put(key: string, value: any) {
     if (!this.block) throw new Error('Block not set');
 
-    if (this.block > 0) this._hook(key, value);
+    if (this.block > 0) await this._hook(key, value);
 
     return await this.db.put(key, JSON.stringify({ block: this.block, value }));
   }

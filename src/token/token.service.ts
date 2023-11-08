@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LevelDBService } from 'src/leveldb/leveldb.service';
 import { Token } from 'src/schemas/token';
+import { Utxo } from 'src/schemas/utxo';
 import { getPaginationOptions } from 'src/utils/helpers';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class TokenService {
 
   constructor(
     @InjectModel(Token.name) private tokenModel: Model<Token>,
+    @InjectModel(Utxo.name) private utxoModel: Model<Utxo>,
     private readonly leveldbService: LevelDBService,
   ) {
     this.logger = new Logger(TokenService.name);
@@ -38,10 +40,6 @@ export class TokenService {
       .findOne({ collectionAddress: address })
       .exec();
     return token;
-  }
-
-  async getBalancesForAddress(address: string) {
-    // @todo
   }
 
   async getByPid(pid: number) {
@@ -78,5 +76,27 @@ export class TokenService {
     } catch (e) {}
 
     return {};
+  }
+
+  async getBalancesForAddress(address: string) {
+    const balances = await this.utxoModel.aggregate([
+      { $match: { address: address } },
+      {
+        $group: {
+          _id: { ticker: '$ticker', id: '$id' },
+          totalAmount: { $sum: { $toDecimal: '$amount' } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          ticker: '$_id.ticker',
+          id: '$_id.id',
+          balance: '$totalAmount',
+        },
+      },
+    ]);
+
+    return balances;
   }
 }

@@ -28,11 +28,11 @@ export class UtxoEntity {
 
   @ApiProperty()
   @Expose()
-  createdAt: Date;
+  block: number;
 
   @ApiProperty()
   @Expose()
-  updatedAt: Date;
+  createdAt: Date;
 
   constructor(partial: Partial<UtxoEntity>) {
     Object.assign(this, partial);

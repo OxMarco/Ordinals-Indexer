@@ -17,8 +17,11 @@ export class Utxo {
   @Prop({ required: true })
   amount: string;
 
-  @Prop({ required: true, default: false })
-  spent: boolean;
+  @Prop({ required: true })
+  ticker: string;
+
+  @Prop({ required: true })
+  id: number;
 
   @Prop({ required: true, index: true })
   block: number;

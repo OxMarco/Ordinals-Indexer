@@ -10,8 +10,8 @@ import { Utxo, UtxoSchema } from 'src/schemas/utxo';
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: Utxo.name, schema: UtxoSchema },
       { name: Token.name, schema: TokenSchema },
+      { name: Utxo.name, schema: UtxoSchema },
     ]),
   ],
   providers: [IndexerService, TokenService, UtxoService, IndexScheduler],

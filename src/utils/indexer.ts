@@ -33,7 +33,7 @@ export class Indexer {
   private db;
   private legacy_block_end = 810000;
   private total_limit = 18446744073709551615n;
-  block = 811476;
+  block = 809607;
 
   private op_table: any = {
     p: '50',
@@ -116,7 +116,8 @@ export class Indexer {
 
   async init() {
     try {
-      this.block = await this.db.get('b');
+      this.logger.log('Indexer started');
+      this.block = (await this.db.get('b')) + 1;
     } catch {}
   }
 
@@ -126,9 +127,10 @@ export class Indexer {
         await this.db.get('mrk');
       } catch (e) {
         await this.db.close();
+        this.logger.log('Indexer stopped');
         return;
       }
-      await sleep(10);
+      await sleep(100);
     }
   }
 
@@ -276,8 +278,6 @@ export class Indexer {
           }
         } catch (e) {}
       }
-
-      this.logger.debug(`Start indexing block ${this.block}`);
 
       const blockhash = await this.rpc.call('getblockhash', [this.block]);
       const tx = await this.rpc.call('getblock', [blockhash, 3]);

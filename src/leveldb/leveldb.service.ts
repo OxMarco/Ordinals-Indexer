@@ -1,22 +1,9 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Level } from 'level';
-import { sleep } from 'src/utils/helpers';
 
 @Injectable()
-export class LevelDBService implements OnModuleDestroy {
+export class LevelDBService {
   constructor(@Inject('LEVELDB_CONNECTION') private db: Level) {}
-
-  async onModuleDestroy() {
-    while (true) {
-      try {
-        await this.db.get('mrk');
-      } catch (e) {
-        await this.db.close();
-        return;
-      }
-      await sleep(10);
-    }
-  }
 
   async get(key: string) {
     return await this.db.get(key);
