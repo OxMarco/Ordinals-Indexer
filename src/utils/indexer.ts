@@ -11,6 +11,9 @@ import {
   sleep,
   toString26,
 } from './helpers';
+import { LevelDBAdapter } from 'src/leveldb/leveldb.adapter';
+import { LevelDBService } from 'src/leveldb/leveldb.service';
+import { IndexerService } from 'src/indexer/indexer.service';
 
 type SpentTokenCount = {
   [key: string]: bigint;
@@ -96,12 +99,17 @@ export class Indexer {
     'video/webm',
   ];
 
-  constructor(url: string, leveldbService: any, network: Networks = 'main') {
+  constructor(
+    url: string,
+    dbInstance: LevelDBService,
+    indexerService: IndexerService,
+    network: Networks = 'main',
+  ) {
     this.logger = new Logger(Indexer.name);
     this.rpc = new RPC(url, this.logger);
 
     this.network = network;
-    this.db = leveldbService;
+    this.db = new LevelDBAdapter(dbInstance, indexerService);
 
     this.logger.log('Indexer started');
   }

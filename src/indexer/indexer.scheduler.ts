@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Indexer, IndexerErrors } from 'src/utils/indexer';
 import { LevelDBService } from 'src/leveldb/leveldb.service';
+import { IndexerService } from './indexer.service';
 
 @Injectable()
 export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
@@ -17,11 +18,13 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly leveldbService: LevelDBService,
+    private indexerService: IndexerService,
     private configService: ConfigService,
   ) {
     this.indexer = new Indexer(
       this.configService.get<string>('BITCOIN_NODE_URL') || '',
       leveldbService,
+      indexerService,
     );
 
     this.logger.log('Cronjob started');

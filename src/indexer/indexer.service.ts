@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import { Model } from 'mongoose';
 import { Token } from 'src/schemas/token';
 import { Utxo } from 'src/schemas/utxo';
 
@@ -18,22 +18,21 @@ export class IndexerService implements OnModuleInit {
 
   async onModuleInit() {
     const records = await this.tokenModel.countDocuments().exec();
-    if(records === 1)
-      this.pid = 0;
-    else
-      this.pid = records
+    if (records === 1) this.pid = 0;
+    else this.pid = records;
   }
 
   async saveOrUpdateToken(tokenData: any) {
-    console.log("saveOrUpdateToken")
+    console.log('saveOrUpdateToken');
 
     try {
       const existingToken = await this.tokenModel
         .findOne({ ticker: tokenData.ticker, id: tokenData.id })
         .exec();
-  
+
       if (existingToken) {
-        existingToken.remaining = tokenData.remaining ?? existingToken.remaining;
+        existingToken.remaining =
+          tokenData.remaining ?? existingToken.remaining;
         await existingToken.save();
         this.logger.log(`Token ${tokenData.ticker}:${tokenData.id} updated.`);
       } else {
@@ -50,19 +49,19 @@ export class IndexerService implements OnModuleInit {
       this.logger.error(e);
     }
   }
-  
+
   async addUtxo(data: any, block: number) {
     try {
-        const utxo: Utxo = {
-          address: data.addr,
-          txId: data.txid,
-          vout: data.vout,
-          amount: data.amt,
-          spent: false,
-          block: block,
-        };
-        const newUtxo = new this.utxoModel(utxo);
-        await newUtxo.save();
+      const utxo: Utxo = {
+        address: data.addr,
+        txId: data.txid,
+        vout: data.vout,
+        amount: data.amt,
+        spent: false,
+        block: block,
+      };
+      const newUtxo = new this.utxoModel(utxo);
+      await newUtxo.save();
     } catch (e) {
       this.logger.error(`Error occurred when saving new utxo ${data.txid}`);
       this.logger.error(e);
@@ -73,12 +72,18 @@ export class IndexerService implements OnModuleInit {
     try {
       const utxo = await this.utxoModel.findOneAndDelete({ txId, vout }).exec();
       if (utxo) {
-        this.logger.log(`UTXO with txId: ${txId} and vout: ${vout} deleted successfully.`);
+        this.logger.log(
+          `UTXO with txId: ${txId} and vout: ${vout} deleted successfully.`,
+        );
       } else {
-        this.logger.error(`UTXO with txId ${txId} and vout: ${vout} not found.`);
+        this.logger.error(
+          `UTXO with txId ${txId} and vout: ${vout} not found.`,
+        );
       }
     } catch (e) {
-      this.logger.error(`Error occurred when deleting UTXO with txId ${txId} and vout: ${vout}.`);
+      this.logger.error(
+        `Error occurred when deleting UTXO with txId ${txId} and vout: ${vout}.`,
+      );
       this.logger.error(e);
     }
   }

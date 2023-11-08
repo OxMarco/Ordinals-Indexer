@@ -73,7 +73,7 @@ export class TokenService {
         const address_amt =
           'a_' + address + '_' + ticker.toLowerCase() + '_' + id;
         const amt = await this.leveldbService.get(address_amt);
-        return {...token, amount: amt};
+        return { ...token, amount: amt };
       }
     } catch (e) {}
 
