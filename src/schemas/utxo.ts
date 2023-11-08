@@ -3,8 +3,8 @@ import { HydratedDocument } from 'mongoose';
 
 export type UtxoDocument = HydratedDocument<Utxo>;
 
-@Schema({ 
-  timestamps: { createdAt: true, updatedAt: false } 
+@Schema({
+  timestamps: { createdAt: true, updatedAt: false },
 })
 export class Utxo {
   @Prop({ required: true, index: true })
@@ -18,6 +18,9 @@ export class Utxo {
 
   @Prop({ required: true })
   amount: string;
+
+  @Prop({ required: true })
+  decimals: number;
 
   @Prop({ required: true })
   ticker: string;

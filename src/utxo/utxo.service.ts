@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Utxo } from 'src/schemas/utxo';
@@ -22,7 +22,7 @@ export class UtxoService {
     const options = getPaginationOptions(pagination);
     const utxos = await this.utxoModel
       .find({ ticker, id }, null, options)
-      .exec(); // @todo test
+      .exec();
     return utxos;
   }
 
@@ -36,6 +36,7 @@ export class UtxoService {
 
   async getByTxidVout(txid: string, vout: number) {
     const utxo = await this.utxoModel.findOne({ txId: txid, vout }).exec();
-    return utxo;
+    if (utxo) return utxo;
+    else throw new NotFoundException({ error: 'utxo not found' });
   }
 }

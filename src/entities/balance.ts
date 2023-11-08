@@ -1,19 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
 
-export class UtxoEntity {
-  @ApiProperty()
-  @Expose()
-  address: string;
-
-  @ApiProperty()
-  @Expose()
-  txId: string;
-
-  @ApiProperty()
-  @Expose()
-  vout: number;
-
+export class BalanceEntity {
   @ApiProperty()
   @Expose()
   amount: string;
@@ -30,15 +18,7 @@ export class UtxoEntity {
   @Expose()
   id: number;
 
-  @ApiProperty()
-  @Expose()
-  block: number;
-
-  @ApiProperty()
-  @Expose()
-  createdAt: Date;
-
-  constructor(partial: Partial<UtxoEntity>) {
+  constructor(partial: Partial<BalanceEntity>) {
     Object.assign(this, partial);
   }
 }

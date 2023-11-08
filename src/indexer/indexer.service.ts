@@ -48,17 +48,25 @@ export class IndexerService implements OnModuleInit {
 
   async addUtxo(data: any, block: number) {
     try {
-      const utxo: Utxo = {
-        address: data.addr,
-        txId: data.txid,
-        vout: data.vout,
-        amount: data.amt,
-        ticker: data.tick,
-        id: data.id,
-        block: block,
-      };
-      const newUtxo = new this.utxoModel(utxo);
-      await newUtxo.save();
+      const token = await this.tokenModel
+        .findOne({ ticker: data.tick, id: data.id })
+        .exec();
+      if (token) {
+        const utxo: Utxo = {
+          address: data.addr,
+          txId: data.txid,
+          vout: data.vout,
+          amount: data.amt,
+          decimals: token.decimals,
+          ticker: data.tick,
+          id: data.id,
+          block: block,
+        };
+        const newUtxo = new this.utxoModel(utxo);
+        await newUtxo.save();
+      } else {
+        console.log('Error!'); // @todo fix it
+      }
     } catch (e) {
       this.logger.error(`Error occurred when saving new utxo ${data.txid}`);
       this.logger.error(e);
@@ -69,9 +77,7 @@ export class IndexerService implements OnModuleInit {
     try {
       const utxo = await this.utxoModel.findOneAndDelete({ txId, vout }).exec();
       if (!utxo) {
-        this.logger.error(
-          `UTXO with txId ${txId} and vout ${vout} not found.`,
-        );
+        this.logger.error(`UTXO with txId ${txId} and vout ${vout} not found.`);
       }
     } catch (e) {
       this.logger.error(

@@ -1,4 +1,5 @@
 import {
+  ClassSerializerInterceptor,
   Controller,
   Get,
   NotFoundException,
@@ -16,6 +17,7 @@ import { Pagination } from 'src/decorators/pagination';
 import { TokenService } from './token.service';
 import { TokenEntity } from 'src/entities/token';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
+import { BalanceEntity } from 'src/entities/balance';
 
 @Controller('token')
 @UseInterceptors(CacheInterceptor)
@@ -99,25 +101,6 @@ export class TokenController {
     return token;
   }
 
-  @ApiOperation({ summary: 'Get a specific token balance for a given address' })
-  @ApiResponse({
-    status: 200,
-    type: Number,
-  })
-  @Get('/get-balance/:ticker/:id/:address')
-  async getBalanceByAddress(
-    @Param('ticker') ticker: string,
-    @Param('id') id: number,
-    @Param('address') address: string,
-  ) {
-    const balance = await this.tokenService.getBalance(
-      address.toLowerCase(),
-      ticker.toLowerCase(),
-      id,
-    );
-    return balance;
-  }
-
   @ApiOperation({ summary: 'Get a token by pid' })
   @ApiResponse({
     status: 200,
@@ -146,17 +129,40 @@ export class TokenController {
     return tokens;
   }
 
+  @ApiOperation({ summary: 'Get a specific token balance for a given address' })
+  @ApiResponse({
+    status: 200,
+    type: BalanceEntity,
+  })
+  @UseInterceptors(ClassSerializerInterceptor)
+  @Get('/get-balance/:ticker/:id/:address')
+  async getBalanceByAddress(
+    @Param('ticker') ticker: string,
+    @Param('id') id: number,
+    @Param('address') address: string,
+  ): Promise<BalanceEntity> {
+    const balance = await this.tokenService.getBalance(
+      address.toLowerCase(),
+      ticker.toLowerCase(),
+      id,
+    );
+    return balance;
+  }
+
   @ApiOperation({ summary: 'Get all tokens held by a given address' })
   @ApiResponse({
     status: 200,
-    type: [TokenEntity],
+    type: [BalanceEntity],
   })
+  @UseInterceptors(ClassSerializerInterceptor)
   @Get('balances/:address')
-  async getTokensByAddress(@Param('address') address: string) {
-    const tokens = await this.tokenService.getBalancesForAddress(
+  async getTokensByAddress(
+    @Param('address') address: string,
+  ): Promise<BalanceEntity[]> {
+    const balances = await this.tokenService.getBalancesForAddress(
       address.toLowerCase(),
     );
-    return tokens;
+    return balances;
   }
 
   @ApiOperation({ summary: 'Get the metadata related to a given token' })

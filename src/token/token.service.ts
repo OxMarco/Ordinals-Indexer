@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { BalanceEntity } from 'src/entities/balance';
 import { LevelDBService } from 'src/leveldb/leveldb.service';
 import { Token } from 'src/schemas/token';
 import { Utxo } from 'src/schemas/utxo';
@@ -26,7 +27,8 @@ export class TokenService {
 
   async get(ticker: string, id: number) {
     const token = await this.tokenModel.findOne({ ticker, id }).exec();
-    return token;
+    if (token) return token;
+    else throw new NotFoundException({ error: 'token not found' });
   }
 
   async getByTicker(ticker: string, pagination = null) {
@@ -39,11 +41,14 @@ export class TokenService {
     const token = await this.tokenModel
       .findOne({ collectionAddress: address })
       .exec();
-    return token;
+    if (token) return token;
+    else throw new NotFoundException({ error: 'token not found' });
   }
 
   async getByPid(pid: number) {
-    return await this.tokenModel.find({ pid }).exec();
+    const token = await this.tokenModel.find({ pid }).exec();
+    if (token) return token;
+    else throw new NotFoundException({ error: 'token not found' });
   }
 
   async getByBlock(block: number, pagination = null) {
@@ -53,7 +58,9 @@ export class TokenService {
 
   async getTokenMetadata(ticker: string, id: number) {
     const token = await this.tokenModel.findOne({ ticker, id }).exec();
-    return { metadata: token?.metadata, mime: token?.mime, ref: token?.ref };
+    if (token)
+      return { metadata: token?.metadata, mime: token?.mime, ref: token?.ref };
+    else throw new NotFoundException({ error: 'token not found' });
   }
 
   async findByTickerSimilarity(ticker: string, pagination = null) {
@@ -64,38 +71,45 @@ export class TokenService {
       .exec();
   }
 
-  async getBalance(address: string, ticker: string, id: number) {
+  async getBalance(
+    address: string,
+    ticker: string,
+    id: number,
+  ): Promise<BalanceEntity> {
     try {
       const token = await this.get(ticker, id);
       if (token !== null) {
         const address_amt =
           'a_' + address + '_' + ticker.toLowerCase() + '_' + id;
-        const amt = await this.leveldbService.get(address_amt);
-        return { ...token, amount: amt };
+        const amt = JSON.parse(await this.leveldbService.get(address_amt));
+        return { decimals: token.decimals, amount: amt.value, ticker, id };
       }
     } catch (e) {}
 
-    return {};
+    throw new NotFoundException({ error: 'token not found' });
   }
 
-  async getBalancesForAddress(address: string) {
-    const balances = await this.utxoModel.aggregate([
-      { $match: { address: address } },
-      {
-        $group: {
-          _id: { ticker: '$ticker', id: '$id' },
-          totalAmount: { $sum: { $toDecimal: '$amount' } },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          ticker: '$_id.ticker',
-          id: '$_id.id',
-          balance: '$totalAmount',
-        },
-      },
-    ]);
+  async getBalancesForAddress(address: string): Promise<BalanceEntity[]> {
+    const utxos = await this.utxoModel.find({ address: address }).exec();
+    const balanceMap = new Map();
+
+    utxos.forEach((utxo: Utxo) => {
+      const key = `${utxo.ticker}-${utxo.id}`;
+      const value = balanceMap.get(key) || { amount: 0n, decimals: 0 };
+      value.decimals = utxo.decimals;
+      value.amount += BigInt(utxo.amount);
+      balanceMap.set(key, value);
+    });
+
+    const balances = Array.from(balanceMap, ([key, value]) => {
+      const [ticker, id] = key.split('-');
+      return {
+        ticker,
+        id: Number(id),
+        amount: value.amount.toString(),
+        decimals: value.decimals,
+      };
+    });
 
     return balances;
   }

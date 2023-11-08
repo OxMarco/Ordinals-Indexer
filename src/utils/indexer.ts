@@ -116,12 +116,13 @@ export class Indexer {
 
   async init() {
     try {
-      this.logger.log("Indexer started");
-      this.block = await this.db.get('b') + 1;
+      this.logger.log('Indexer started');
+      this.block = (await this.db.get('b')) + 1;
     } catch {}
   }
 
   async close() {
+    this.logger.debug('Interrupt signal received, closing indexer');
     while (true) {
       try {
         await this.db.get('mrk');
