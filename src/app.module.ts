@@ -13,11 +13,9 @@ import { TokenModule } from './token/token.module';
 import { UtxoModule } from './utxo/utxo.module';
 import { BotModule } from './bot/bot.module';
 import { IndexerModule } from './indexer/indexer.module';
-import { LevelDBModule } from './leveldb/leveldb.module';
 
 @Module({
   imports: [
-    LevelDBModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([
       {

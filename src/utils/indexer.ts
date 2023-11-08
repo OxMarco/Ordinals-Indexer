@@ -30,7 +30,7 @@ export class Indexer {
   private db;
   private legacy_block_end = 810000;
   private total_limit = 18446744073709551615n;
-  block = 809607;
+  block = 811476;
 
   private op_table: any = {
     p: '50',
@@ -464,9 +464,9 @@ export class Indexer {
     this.logger.debug(`Done indexing block ${this.block}`);
 
     if (await this.mustIndex()) {
+      await sleep(1000);
       this.block += 1;
       await this.index();
-      await sleep(2000);
     }
 
     return IndexerErrors.OK;
@@ -1160,8 +1160,17 @@ export class Indexer {
                     JSON.stringify({
                       tick: ticker,
                       id: id,
+                      dec: decimals,
+                      max: max,
+                      lim: limit,
+                      rem: max,
+                      tx: tx.txid,
+                      vo: vout,
+                      bvo: output,
+                      baddr: to_address,
                       col: collection_address,
-                      num: num1,
+                      colnum: num1,
+                      blck: block,
                       traits: traits,
                       mime: mime,
                       metadata: hex,

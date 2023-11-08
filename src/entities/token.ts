@@ -74,6 +74,10 @@ export class TokenEntity {
   @Expose()
   vo: number;
 
+  @ApiPropertyOptional()
+  @Expose()
+  amount?: number;
+
   @ApiProperty()
   @Expose()
   createdAt: Date;

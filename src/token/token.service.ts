@@ -73,10 +73,10 @@ export class TokenService {
         const address_amt =
           'a_' + address + '_' + ticker.toLowerCase() + '_' + id;
         const amt = await this.leveldbService.get(address_amt);
-        return amt; // @todo consider returning decimals too
+        return {...token, amount: amt};
       }
     } catch (e) {}
 
-    return 0;
+    return {};
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { ClientSession, Model } from 'mongoose';
 import { Token } from 'src/schemas/token';
 import { Utxo } from 'src/schemas/utxo';
 
@@ -17,86 +17,68 @@ export class IndexerService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    this.pid = await this.tokenModel.countDocuments().exec();
+    const records = await this.tokenModel.countDocuments().exec();
+    if(records === 1)
+      this.pid = 0;
+    else
+      this.pid = records
   }
 
-  async saveDeployment(token: Token) {
+  async saveOrUpdateToken(tokenData: any) {
+    console.log("saveOrUpdateToken")
+
     try {
       const existingToken = await this.tokenModel
-        .findOne({ ticker: token.ticker, id: token.id })
+        .findOne({ ticker: tokenData.ticker, id: tokenData.id })
         .exec();
-      if (!existingToken) {
-        token.pid = this.pid;
-        const newToken = new this.tokenModel(token);
-        await newToken.save();
-        this.pid += 1;
+  
+      if (existingToken) {
+        existingToken.remaining = tokenData.remaining ?? existingToken.remaining;
+        await existingToken.save();
+        this.logger.log(`Token ${tokenData.ticker}:${tokenData.id} updated.`);
       } else {
-        console.log(token);
-        this.logger.error(
-          `Duplicated entry for token ${token.ticker}:${token.id}`,
-        );
+        tokenData.pid = this.pid;
+        const newToken = new this.tokenModel(tokenData);
+        await newToken.save();
+        this.logger.log(`Token ${tokenData.ticker}:${tokenData.id} created.`);
+        this.pid += 1;
       }
     } catch (e) {
       this.logger.error(
-        `Error occurred when saving token ${token.ticker}:${token.id}`,
+        `Error occurred during save or update of token ${tokenData.ticker}:${tokenData.id}`,
       );
       this.logger.error(e);
     }
   }
-
-  async updateRemaining(ticker: string, id: number, remaining: number) {
-    try {
-      const token = await this.tokenModel.findOne({ ticker, id }).exec();
-      if (token) {
-        token.remaining = remaining;
-        await token.save();
-      } else {
-        this.logger.error(`token ${ticker}:${id} not found`);
-      }
-    } catch (e) {
-      this.logger.error(`Error occurred when updating token ${ticker}:${id}`);
-      this.logger.error(e);
-    }
-  }
-
+  
   async addUtxo(data: any, block: number) {
     try {
-      const token = await this.tokenModel
-        .findOne({ ticker: data.tick, id: data.id })
-        .exec();
-      if (token != null) {
         const utxo: Utxo = {
           address: data.addr,
           txId: data.txid,
           vout: data.vout,
           amount: data.amt,
-          token: token,
           spent: false,
           block: block,
         };
         const newUtxo = new this.utxoModel(utxo);
         await newUtxo.save();
-      } else {
-        this.logger.error(`Token ${data.tick}:${data.id} not found`);
-      }
     } catch (e) {
       this.logger.error(`Error occurred when saving new utxo ${data.txid}`);
       this.logger.error(e);
     }
   }
 
-  async markUtxoAsSpent(txId: string, vout: number, block: number) {
+  async deleteUtxo(txId: string, vout: number) {
     try {
-      const utxo = await this.utxoModel.findOne({ txId, vout }).exec();
-      if (utxo !== null) {
-        utxo.spent = true;
-        utxo.block = block;
-        await utxo.save();
+      const utxo = await this.utxoModel.findOneAndDelete({ txId, vout }).exec();
+      if (utxo) {
+        this.logger.log(`UTXO with txId: ${txId} and vout: ${vout} deleted successfully.`);
       } else {
-        this.logger.error(`utxo with txId ${txId} not found`);
+        this.logger.error(`UTXO with txId ${txId} and vout: ${vout} not found.`);
       }
     } catch (e) {
-      this.logger.error(`Error occurred when marking utxo ${txId} as spent`);
+      this.logger.error(`Error occurred when deleting UTXO with txId ${txId} and vout: ${vout}.`);
       this.logger.error(e);
     }
   }

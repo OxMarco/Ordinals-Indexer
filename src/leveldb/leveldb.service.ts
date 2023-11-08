@@ -43,6 +43,30 @@ export class LevelDBService implements OnModuleDestroy {
     await this.indexerService.removeAllRecordsByBlock(block);
   }
 
+  private async _saveToken(parsedVal: any) {
+    const data: Token = {
+      pid: 0,
+      ticker: parsedVal.tick,
+      id: parsedVal.id,
+      beneficiaryAddress: parsedVal?.baddr,
+      decimals: parsedVal?.dec,
+      maxSupply: parsedVal?.max,
+      limit: parsedVal?.lim,
+      remaining: parsedVal?.rem,
+      collectionNumber: parsedVal?.colnum,
+      collectionAddress: parsedVal?.col,
+      txId: parsedVal?.tx,
+      block: parsedVal?.blck,
+      bvo: parsedVal?.bvo,
+      vo: parsedVal?.vo,
+      traits: parsedVal?.traits,
+      mime: parsedVal?.mime,
+      ref: parsedVal?.ref,
+      metadata: parsedVal?.metadata,
+    };
+    await this.indexerService.saveOrUpdateToken(data);
+  }
+
   private async _hook(key: string, value: string) {
     // Parse UTXO
     if (key.startsWith('utxo_')) {
@@ -55,50 +79,20 @@ export class LevelDBService implements OnModuleDestroy {
         txid: parts[2],
         vout: parseInt(parts[3]),
       };
-      await this.indexerService.markUtxoAsSpent(
+      await this.indexerService.deleteUtxo(
         data.txid,
         data.vout,
-        this.block,
       );
       // Parse deployment
     } else if (key.startsWith('d_')) {
       const parsedVal = JSON.parse(value);
-      try {
-        await this.db.get(key);
-        // deployment exists, it's an update
-        await this.indexerService.updateRemaining(
-          parsedVal.tick,
-          parsedVal.id,
-          parsedVal.rem,
-        );
-      } catch {
-        // deployment does not exist, it's a new deployment
-        const data: Token = {
-          pid: 0,
-          ticker: parsedVal.tick,
-          id: parsedVal.id,
-          beneficiaryAddress: parsedVal?.baddr,
-          decimals: parsedVal?.dec,
-          maxSupply: parsedVal?.max,
-          limit: parsedVal?.lim,
-          remaining: parsedVal?.rem,
-          collectionNumber: parsedVal?.colnum,
-          collectionAddress: parsedVal?.col,
-          txId: parsedVal?.tx,
-          block: parsedVal?.blck,
-          bvo: parsedVal?.bvo,
-          vo: parsedVal?.vo,
-          traits: parsedVal?.traits,
-          mime: parsedVal?.mime,
-          ref: parsedVal?.ref,
-          metadata: parsedVal?.metadata,
-        };
-        await this.indexerService.saveDeployment(data);
-      }
+      this._saveToken(parsedVal);
     } else if (key.startsWith('a_')) {
-      // Update user balance
     } else if (key.startsWith('c_max_')) {
-      console.log('collectible max update');
+    } else if (key.startsWith('c_')) {
+      // new art deployment
+      const parsedVal = JSON.parse(value);
+      this._saveToken(parsedVal);
     }
   }
 
