@@ -37,7 +37,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data_container:/data
+      - redis_data_container:/data/redis
 
   mongo:
     image: "mongo:latest"
