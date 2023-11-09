@@ -25,6 +25,8 @@ services:
         condition: service_started
       redis:
         condition: service_started
+    volumes:
+      - nestjs_data_container:/usr/src/app
 
   redis:
     image: "redis:alpine"
@@ -34,6 +36,8 @@ services:
       - REDIS_REPLICATION_MODE=master
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data_container:/data
 
   mongo:
     image: "mongo:latest"
@@ -48,4 +52,6 @@ services:
       - mongodb_data_container:/data/db
 
 volumes:
+  nestjs_data_container:
   mongodb_data_container:
+  redis_data_container:

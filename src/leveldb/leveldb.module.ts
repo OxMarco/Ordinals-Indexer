@@ -9,7 +9,7 @@ import { LevelDBService } from './leveldb.service';
     {
       provide: 'LEVELDB_CONNECTION',
       useFactory: async () => {
-        const db = new Level('pipe_db', { valueEncoding: 'json' });
+        const db = new Level('/usr/src/app/pipe_db', { valueEncoding: 'json' });
         return db;
       },
     },
