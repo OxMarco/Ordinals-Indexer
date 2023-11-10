@@ -33,7 +33,11 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async handleCron() {
+    this.logger.debug("Hello")
+
     if (this.running) return;
+
+    this.logger.debug("In indexing")
 
     if (await this.indexer.mustIndex()) {
       this.logger.debug("Should index")
@@ -45,6 +49,8 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
 
   async runIndexing() {
     this.running = true;
+
+    this.logger.log(`Indexing block ${this.indexer.block}`);
 
     const res = await this.indexer.index();
     if (res == IndexerErrors.REORG) {
