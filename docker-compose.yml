@@ -1,11 +1,28 @@
 version: '3.8'
 
 services:
+  redis:
+    image: "redis:latest"
+    container_name: redis
+    command: redis-server --requirepass redispassword
+    environment:
+      - REDIS_REPLICATION_MODE=master
+    volumes:
+      - redis_data_container:/data
+
+  mongo:
+    image: "mongo:latest"
+    container_name: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongoadmin
+      MONGO_INITDB_ROOT_PASSWORD: mongopassword
+      MONGO_INITDB_DATABASE: nestjsdb
+    volumes:
+      - mongodb_data_container:/data/db
+
   nestjs:
     container_name: nestjs-backend
     build: .
-    ports:
-      - "3000:3000"
     stop_signal: SIGTERM
     stop_grace_period: 200s
     environment:
@@ -27,29 +44,23 @@ services:
         condition: service_started
     volumes:
       - nestjs_data_container:/usr/src/app
+    links:
+      - mongo
+      - redis
 
-  redis:
-    image: "redis:alpine"
-    container_name: redis
-    command: redis-server --requirepass redispassword
-    environment:
-      - REDIS_REPLICATION_MODE=master
+  nginx:
+    image: "nginx:latest"
+    container_name: nginx
     ports:
-      - "6379:6379"
+      - "80:80"
+      - "443:443"
     volumes:
-      - redis_data_container:/data/redis
-
-  mongo:
-    image: "mongo:latest"
-    container_name: mongo
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: mongoadmin
-      MONGO_INITDB_ROOT_PASSWORD: mongopassword
-      MONGO_INITDB_DATABASE: nestjsdb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data_container:/data/db
+      - ./nginx:/etc/nginx
+    depends_on:
+      nestjs:
+        condition: service_started
+    links:
+      - nestjs
 
 volumes:
   nestjs_data_container:

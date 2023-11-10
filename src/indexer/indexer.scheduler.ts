@@ -31,7 +31,7 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
     this.running = false;
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async handleCron() {
     if (this.running) return;
 

@@ -5,3 +5,5 @@ pipe_db
 node_modules
 dist
 .env
+nginx
+.DS_Store

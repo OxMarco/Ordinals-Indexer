@@ -475,7 +475,7 @@ export class Indexer {
     this.logger.debug(`Done indexing block ${this.block}`);
 
     if (await this.mustIndex()) {
-      await sleep(500);
+      await sleep(1000);
       this.block += 1;
       await this.index();
     }
