@@ -18,6 +18,7 @@ import { TokenService } from './token.service';
 import { TokenEntity } from 'src/entities/token';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
 import { BalanceEntity } from 'src/entities/balance';
+import { hexToString } from 'src/utils/helpers';
 
 @Controller('token')
 @UseInterceptors(CacheInterceptor)
@@ -198,12 +199,13 @@ export class TokenController {
       switch (tokenData.mime) {
         case 'application/json':
         case 'text/plain':
+        case 'text/plain;charset=utf-8':
         case 'text/markdown':
         case 'text/html':
         case 'text/css':
         case 'text/javascript':
           res.setHeader('Content-Type', tokenData.mime);
-          res.send(tokenData.metadata);
+          res.send(hexToString(tokenData.metadata));
           break;
         case 'image/webp':
         case 'image/png':
