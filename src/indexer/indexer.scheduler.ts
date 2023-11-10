@@ -14,7 +14,7 @@ import { IndexerService } from './indexer.service';
 export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IndexScheduler.name);
   private indexer;
-  running;
+  private running;
 
   constructor(
     private readonly leveldbService: LevelDBService,
@@ -45,15 +45,17 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
     if (res == IndexerErrors.REORG) {
       await this.indexer.cleanup();
     } else if (res == IndexerErrors.BLOCK_AREADY_ANALYSED) {
-      // @todo handle this better
       this.indexer.block += 1;
     }
+
+    this.logger.log(`Finished indexing block ${this.indexer.block}`);
 
     this.running = false;
   }
 
   async onModuleInit() {
     await this.indexer.init();
+    this.logger.log('Cronjob started');
   }
 
   async onModuleDestroy() {

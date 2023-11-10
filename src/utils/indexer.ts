@@ -110,8 +110,6 @@ export class Indexer {
 
     this.network = network;
     this.db = new LevelDBAdapter(dbInstance, indexerService);
-
-    this.logger.log('Indexer started');
   }
 
   async init() {

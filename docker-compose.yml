@@ -37,6 +37,7 @@ services:
       REDIS_DB_NAME: "nestjsredis"
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
+      NFT_STORAGE_TOKEN: "${NFT_STORAGE_TOKEN}"
     depends_on:
       mongo:
         condition: service_started
