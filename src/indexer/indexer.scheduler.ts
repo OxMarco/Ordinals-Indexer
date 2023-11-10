@@ -35,7 +35,12 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   async handleCron() {
     if (this.running) return;
 
-    if (await this.indexer.mustIndex()) await this.runIndexing();
+    if (await this.indexer.mustIndex()) {
+      this.logger.debug("Should index")
+      await this.runIndexing();
+    } else {
+      this.logger.debug("Should not index")
+    }
   }
 
   async runIndexing() {
