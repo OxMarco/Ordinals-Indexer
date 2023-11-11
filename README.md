@@ -26,8 +26,3 @@ Contains the indexer peripheral logic:
 - Redis queue
 - Necord with discord.js
 - OpenAI lib
-
-## ToDo
-- [ ] Remove comments from caching
-- [ ] Add c_max to db
-- [ ] port getBalances from leveldb

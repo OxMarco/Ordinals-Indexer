@@ -19,6 +19,7 @@ import { TokenEntity } from 'src/entities/token';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
 import { BalanceEntity } from 'src/entities/balance';
 import { hexToString } from 'src/utils/helpers';
+import { LowercasePipe } from 'src/validation/lowercase';
 
 @Controller('token')
 @UseInterceptors(CacheInterceptor)
@@ -49,7 +50,7 @@ export class TokenController {
     @Pagination() pagination: any,
   ) {
     const tokens = await this.tokenService.findByTickerSimilarity(
-      ticker.toLowerCase(),
+      ticker,
       pagination,
     );
     return tokens;
@@ -62,13 +63,10 @@ export class TokenController {
   })
   @Get('/by-ticker/:ticker')
   async getByTicker(
-    @Param('ticker') ticker: string,
+    @Param('ticker', LowercasePipe) ticker: string,
     @Pagination() pagination: any,
   ) {
-    const tokens = await this.tokenService.getByTicker(
-      ticker.toLowerCase(),
-      pagination,
-    );
+    const tokens = await this.tokenService.getByTicker(ticker, pagination);
     return tokens;
   }
 
@@ -78,8 +76,11 @@ export class TokenController {
     type: TokenEntity,
   })
   @Get('/get/:ticker/:id')
-  async get(@Param('ticker') ticker: string, @Param('id') id: number) {
-    const token = await this.tokenService.get(ticker.toLowerCase(), id);
+  async get(
+    @Param('ticker', LowercasePipe) ticker: string,
+    @Param('id') id: number,
+  ) {
+    const token = await this.tokenService.get(ticker, id);
     if (!token) {
       throw new NotFoundException({ error: 'token not found' });
     }
@@ -92,10 +93,10 @@ export class TokenController {
     type: TokenEntity,
   })
   @Get('/by-collection/:collection')
-  async getByCollectionAddress(@Param('collection') collection: string) {
-    const token = await this.tokenService.getByCollectionAddress(
-      collection.toLowerCase(),
-    );
+  async getByCollectionAddress(
+    @Param('collection', LowercasePipe) collection: string,
+  ) {
+    const token = await this.tokenService.getByCollectionAddress(collection);
     if (!token) {
       throw new NotFoundException({ error: 'token not found' });
     }
@@ -116,6 +117,25 @@ export class TokenController {
     return token;
   }
 
+  @ApiOperation({ summary: 'Get tokens by pid range' })
+  @ApiResponse({
+    status: 200,
+    type: [TokenEntity],
+  })
+  @Get('/by-pid-range/:start/:stop')
+  async getByPidRange(
+    @Param('start') start: number,
+    @Param('stop') stop: number,
+    @Pagination() pagination: any,
+  ) {
+    const tokens = await this.tokenService.getByPidRange(
+      start,
+      stop,
+      pagination,
+    );
+    return tokens;
+  }
+
   @ApiOperation({ summary: 'Get tokens by block' })
   @ApiResponse({
     status: 200,
@@ -130,6 +150,17 @@ export class TokenController {
     return tokens;
   }
 
+  @ApiOperation({ summary: 'Get tokens by mime type' })
+  @ApiResponse({
+    status: 200,
+    type: [TokenEntity],
+  })
+  @Get('/by-mime/:mime')
+  async getByMime(@Param('mime') mime: string, @Pagination() pagination: any) {
+    const tokens = await this.tokenService.getByMimetype(mime, pagination);
+    return tokens;
+  }
+
   @ApiOperation({ summary: 'Get a specific token balance for a given address' })
   @ApiResponse({
     status: 200,
@@ -138,15 +169,11 @@ export class TokenController {
   @UseInterceptors(ClassSerializerInterceptor)
   @Get('/get-balance/:ticker/:id/:address')
   async getBalanceByAddress(
-    @Param('ticker') ticker: string,
+    @Param('ticker', LowercasePipe) ticker: string,
     @Param('id') id: number,
-    @Param('address') address: string,
+    @Param('address', LowercasePipe) address: string,
   ): Promise<BalanceEntity> {
-    const balance = await this.tokenService.getBalance(
-      address.toLowerCase(),
-      ticker.toLowerCase(),
-      id,
-    );
+    const balance = await this.tokenService.getBalance(address, ticker, id);
     return balance;
   }
 
@@ -158,25 +185,20 @@ export class TokenController {
   @UseInterceptors(ClassSerializerInterceptor)
   @Get('balances/:address')
   async getTokensByAddress(
-    @Param('address') address: string,
+    @Param('address', LowercasePipe) address: string,
   ): Promise<BalanceEntity[]> {
-    const balances = await this.tokenService.getBalancesForAddress(
-      address.toLowerCase(),
-    );
+    const balances = await this.tokenService.getBalancesForAddress(address);
     return balances;
   }
 
   @ApiOperation({ summary: 'Get the metadata related to a given token' })
   @Get('metadata/:ticker/:id')
   async getTokenMetadata(
-    @Param('ticker') ticker: string,
+    @Param('ticker', LowercasePipe) ticker: string,
     @Param('id') id: number,
     @Res() res: Response,
   ) {
-    const tokenData = await this.tokenService.getTokenMetadata(
-      ticker.toLowerCase(),
-      id,
-    );
+    const tokenData = await this.tokenService.getTokenMetadata(ticker, id);
 
     if (tokenData.ref) {
       try {

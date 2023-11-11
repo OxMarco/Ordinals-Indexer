@@ -3,14 +3,16 @@ import {
   Get,
   NotFoundException,
   Param,
+  Query,
   UseInterceptors,
 } from '@nestjs/common';
 import { CacheInterceptor } from '@nestjs/cache-manager';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UtxoService } from './utxo.service';
 import { Pagination } from 'src/decorators/pagination';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
 import { UtxoEntity } from 'src/entities/utxo';
+import { LowercasePipe } from 'src/validation/lowercase';
 
 @Controller('utxo')
 @UseInterceptors(CacheInterceptor)
@@ -35,12 +37,26 @@ export class UtxoController {
     status: 200,
     type: [UtxoEntity],
   })
-  @Get('/:txid')
-  async getByTxId(@Param('txid') txid: string, @Pagination() pagination: any) {
-    const utxos = await this.utxoService.getByTxId(
-      txid.toLowerCase(),
-      pagination,
-    );
+  @Get('/by-txid/:txid')
+  async getByTxId(
+    @Param('txid', LowercasePipe) txid: string,
+    @Pagination() pagination: any,
+  ) {
+    const utxos = await this.utxoService.getByTxId(txid, pagination);
+    return utxos;
+  }
+
+  @ApiOperation({ summary: 'Get all utxos related to the given address' })
+  @ApiResponse({
+    status: 200,
+    type: [UtxoEntity],
+  })
+  @Get('/by-address/:address')
+  async getByAddress(
+    @Param('address', LowercasePipe) address: string,
+    @Pagination() pagination: any,
+  ) {
+    const utxos = await this.utxoService.getByAddress(address, pagination);
     return utxos;
   }
 
@@ -49,14 +65,32 @@ export class UtxoController {
     status: 200,
     type: UtxoEntity,
   })
-  @Get('/:txid/:vout')
+  @Get('/get/:txid/:vout')
   async getByTxidVout(
-    @Param('txid') txid: string,
+    @Param('txid', LowercasePipe) txid: string,
     @Param('vout') vout: number,
   ) {
-    const utxo = await this.utxoService.getByTxidVout(txid.toLowerCase(), vout);
+    const utxo = await this.utxoService.getByTxidVout(txid, vout);
     if (!utxo) {
       throw new NotFoundException({ error: 'utxo not found' });
     }
+  }
+
+  @ApiOperation({
+    summary: 'Get all utxos related to the given fields',
+  })
+  @ApiParam({
+    name: 'params',
+    type: String,
+    format: 'txid1_vout1,txid2_vout2,...,txidN_voutN',
+  })
+  @ApiResponse({
+    status: 200,
+    type: [UtxoEntity],
+  })
+  @Get('search')
+  async search(@Query('params') params: string, @Pagination() pagination: any) {
+    const utxos = await this.utxoService.searchUtxos(params, pagination);
+    return utxos;
   }
 }

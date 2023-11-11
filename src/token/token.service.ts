@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { BalanceEntity } from 'src/entities/balance';
@@ -21,6 +26,10 @@ export class TokenService {
 
   async getAll(pagination = null) {
     const options = getPaginationOptions(pagination);
+    if (!options || Object.keys(options).length === 0)
+      throw new PayloadTooLargeException({
+        error: 'pagination options required',
+      });
     const tokens = await this.tokenModel.find({}, null, options).exec();
     return tokens;
   }
@@ -37,9 +46,9 @@ export class TokenService {
     return tokens;
   }
 
-  async getByCollectionAddress(address: string) {
+  async getByCollectionAddress(collection: string) {
     const token = await this.tokenModel
-      .findOne({ collectionAddress: address })
+      .findOne({ collectionAddress: collection })
       .exec();
     if (token) return token;
     else throw new NotFoundException({ error: 'token not found' });
@@ -51,9 +60,23 @@ export class TokenService {
     else throw new NotFoundException({ error: 'token not found' });
   }
 
+  async getByPidRange(start: number, stop: number, pagination = null) {
+    const options = getPaginationOptions(pagination);
+    const query = {
+      pid: { $gte: start, $lte: stop },
+    };
+    return await this.tokenModel.find(query, null, options).exec();
+  }
+
   async getByBlock(block: number, pagination = null) {
     const options = getPaginationOptions(pagination);
     return await this.tokenModel.find({ block }, null, options).exec();
+  }
+
+  async getByMimetype(mime: string, pagination = null) {
+    const options = getPaginationOptions(pagination);
+    const tokens = await this.tokenModel.find({ mime }, null, options).exec();
+    return tokens;
   }
 
   async getTokenMetadata(ticker: string, id: number) {
@@ -79,8 +102,7 @@ export class TokenService {
     try {
       const token = await this.get(ticker, id);
       if (token !== null) {
-        const address_amt =
-          'a_' + address + '_' + ticker.toLowerCase() + '_' + id;
+        const address_amt = 'a_' + address + '_' + ticker + '_' + id;
         const amt = JSON.parse(await this.leveldbService.get(address_amt));
         return { decimals: token.decimals, amount: amt.value, ticker, id };
       }
