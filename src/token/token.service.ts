@@ -79,6 +79,14 @@ export class TokenService {
     return tokens;
   }
 
+  async getByDeployer(beneficiaryAddress: string, pagination = null) {
+    const options = getPaginationOptions(pagination);
+    const tokens = await this.tokenModel
+      .find({ beneficiaryAddress }, null, options)
+      .exec();
+    return tokens;
+  }
+
   async getTokenMetadata(ticker: string, id: number) {
     const token = await this.tokenModel.findOne({ ticker, id }).exec();
     if (token)

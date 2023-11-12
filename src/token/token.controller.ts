@@ -150,6 +150,20 @@ export class TokenController {
     return tokens;
   }
 
+  @ApiOperation({ summary: 'Get tokens by deployer address' })
+  @ApiResponse({
+    status: 200,
+    type: [TokenEntity],
+  })
+  @Get('/by-deployer/:address')
+  async getByDeployer(
+    @Param('address') address: string,
+    @Pagination() pagination: any,
+  ) {
+    const tokens = await this.tokenService.getByDeployer(address, pagination);
+    return tokens;
+  }
+
   @ApiOperation({ summary: 'Get tokens by mime type' })
   @ApiResponse({
     status: 200,

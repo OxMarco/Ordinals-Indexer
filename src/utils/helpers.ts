@@ -3,21 +3,25 @@ export async function sleep(ms: number) {
 }
 
 export function getPaginationOptions(pagination: any) {
-  const { page, limit, rel } = pagination;
+  const { page, limit, sort } = pagination;
 
   const options: {
-    limit?: number;
-    skip?: number;
-    sort?: object;
-  } = {};
+    limit: number;
+    skip: number;
+    sort: object;
+  } = {
+    limit: 50,
+    skip: 0,
+    sort: { createdAt: sort },
+  };
 
-  if (limit) {
+  if (limit > 0 && limit < 50) {
     options.limit = limit;
-    options.skip = page && page > 0 ? (page - 1) * limit : 0;
   }
+  options.skip = page && page > 0 ? (page - 1) * options.limit : 0;
 
-  if (rel) {
-    options.sort = { createdAt: rel === 'asc' ? 1 : -1 };
+  if (sort) {
+    options.sort = { createdAt: sort };
   }
 
   return options;
