@@ -17,12 +17,15 @@ import { Pagination } from 'src/decorators/pagination';
 import { TokenService } from './token.service';
 import { TokenEntity } from 'src/entities/token';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
+import { PaginationInterceptor } from 'src/interceptors/pagination';
 import { BalanceEntity } from 'src/entities/balance';
 import { hexToString } from 'src/utils/helpers';
 import { LowercasePipe } from 'src/validation/lowercase';
+import { TokenExtendedEntity } from 'src/entities/token-extended';
 
 @Controller('token')
 @UseInterceptors(CacheInterceptor)
+@UseInterceptors(PaginationInterceptor)
 @MongooseClassSerializerInterceptor(TokenEntity)
 @ApiTags('token')
 export class TokenController {
@@ -35,7 +38,7 @@ export class TokenController {
   })
   @Get('/')
   async getAll(@Pagination() pagination: any) {
-    const tokens = this.tokenService.getAll(pagination);
+    const tokens = await this.tokenService.getAll(pagination);
     return tokens;
   }
 
@@ -157,10 +160,24 @@ export class TokenController {
   })
   @Get('/by-deployer/:address')
   async getByDeployer(
-    @Param('address') address: string,
+    @Param('address', LowercasePipe) address: string,
     @Pagination() pagination: any,
   ) {
     const tokens = await this.tokenService.getByDeployer(address, pagination);
+    return tokens;
+  }
+
+  @ApiOperation({ summary: 'Get tokens by transaction id' })
+  @ApiResponse({
+    status: 200,
+    type: [TokenEntity],
+  })
+  @Get('/by-deployer/:address')
+  async getByTxId(
+    @Param('txId', LowercasePipe) txId: string,
+    @Pagination() pagination: any,
+  ) {
+    const tokens = await this.tokenService.getByTxId(txId, pagination);
     return tokens;
   }
 
@@ -173,6 +190,24 @@ export class TokenController {
   async getByMime(@Param('mime') mime: string, @Pagination() pagination: any) {
     const tokens = await this.tokenService.getByMimetype(mime, pagination);
     return tokens;
+  }
+
+  @ApiOperation({ summary: 'Get all the holders for a specific token' })
+  @ApiResponse({
+    status: 200,
+    type: [TokenExtendedEntity],
+  })
+  @UseInterceptors(ClassSerializerInterceptor)
+  @Get('/get-holders/:ticker/:id/')
+  async getHoldersByToken(
+    @Param('ticker', LowercasePipe) ticker: string,
+    @Param('id') id: number,
+  ) {
+    const { token, holders } = await this.tokenService.getHoldersByToken(
+      ticker,
+      id,
+    );
+    return { token, holders };
   }
 
   @ApiOperation({ summary: 'Get a specific token balance for a given address' })
@@ -243,6 +278,7 @@ export class TokenController {
           res.setHeader('Content-Type', tokenData.mime);
           res.send(hexToString(tokenData.metadata));
           break;
+        case '\u0000\u0000':
         case 'image/webp':
         case 'image/png':
         case 'image/jpeg':

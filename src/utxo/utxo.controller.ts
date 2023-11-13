@@ -11,11 +11,13 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UtxoService } from './utxo.service';
 import { Pagination } from 'src/decorators/pagination';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
+import { PaginationInterceptor } from 'src/interceptors/pagination';
 import { UtxoEntity } from 'src/entities/utxo';
 import { LowercasePipe } from 'src/validation/lowercase';
 
 @Controller('utxo')
 @UseInterceptors(CacheInterceptor)
+@UseInterceptors(PaginationInterceptor)
 @MongooseClassSerializerInterceptor(UtxoEntity)
 @ApiTags('utxo')
 export class UtxoController {

@@ -32,7 +32,7 @@ export class TokenEntity {
 
   @ApiProperty()
   @Expose()
-  remaining: string;
+  remaining: number;
 
   @ApiProperty()
   @Expose()

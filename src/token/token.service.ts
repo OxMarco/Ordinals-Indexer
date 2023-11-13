@@ -1,16 +1,10 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  PayloadTooLargeException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { BalanceEntity } from 'src/entities/balance';
-import { LevelDBService } from 'src/leveldb/leveldb.service';
 import { Token } from 'src/schemas/token';
 import { Utxo } from 'src/schemas/utxo';
-import { getPaginationOptions } from 'src/utils/helpers';
+import { findWithTotalCount } from 'src/utils/helpers';
 
 @Injectable()
 export class TokenService {
@@ -19,18 +13,12 @@ export class TokenService {
   constructor(
     @InjectModel(Token.name) private tokenModel: Model<Token>,
     @InjectModel(Utxo.name) private utxoModel: Model<Utxo>,
-    private readonly leveldbService: LevelDBService,
   ) {
     this.logger = new Logger(TokenService.name);
   }
 
   async getAll(pagination = null) {
-    const options = getPaginationOptions(pagination);
-    if (!options || Object.keys(options).length === 0)
-      throw new PayloadTooLargeException({
-        error: 'pagination options required',
-      });
-    const tokens = await this.tokenModel.find({}, null, options).exec();
+    const tokens = await findWithTotalCount(this.tokenModel, {}, pagination);
     return tokens;
   }
 
@@ -41,8 +29,20 @@ export class TokenService {
   }
 
   async getByTicker(ticker: string, pagination = null) {
-    const options = getPaginationOptions(pagination);
-    const tokens = await this.tokenModel.find({ ticker }, null, options).exec();
+    const tokens = await findWithTotalCount(
+      this.tokenModel,
+      { ticker },
+      pagination,
+    );
+    return tokens;
+  }
+
+  async getByTxId(txId: string, pagination = null) {
+    const tokens = await findWithTotalCount(
+      this.tokenModel,
+      { txId },
+      pagination,
+    );
     return tokens;
   }
 
@@ -55,35 +55,43 @@ export class TokenService {
   }
 
   async getByPid(pid: number) {
-    const token = await this.tokenModel.find({ pid }).exec();
+    const token = await this.tokenModel.findOne({ pid }).exec();
     if (token) return token;
     else throw new NotFoundException({ error: 'token not found' });
   }
 
   async getByPidRange(start: number, stop: number, pagination = null) {
-    const options = getPaginationOptions(pagination);
     const query = {
       pid: { $gte: start, $lte: stop },
     };
-    return await this.tokenModel.find(query, null, options).exec();
+    const tokens = await findWithTotalCount(this.tokenModel, query, pagination);
+    return tokens;
   }
 
   async getByBlock(block: number, pagination = null) {
-    const options = getPaginationOptions(pagination);
-    return await this.tokenModel.find({ block }, null, options).exec();
+    const tokens = await findWithTotalCount(
+      this.tokenModel,
+      { block },
+      pagination,
+    );
+    return tokens;
   }
 
   async getByMimetype(mime: string, pagination = null) {
-    const options = getPaginationOptions(pagination);
-    const tokens = await this.tokenModel.find({ mime }, null, options).exec();
+    const tokens = await findWithTotalCount(
+      this.tokenModel,
+      { mime },
+      pagination,
+    );
     return tokens;
   }
 
   async getByDeployer(beneficiaryAddress: string, pagination = null) {
-    const options = getPaginationOptions(pagination);
-    const tokens = await this.tokenModel
-      .find({ beneficiaryAddress }, null, options)
-      .exec();
+    const tokens = await findWithTotalCount(
+      this.tokenModel,
+      { beneficiaryAddress },
+      pagination,
+    );
     return tokens;
   }
 
@@ -95,11 +103,10 @@ export class TokenService {
   }
 
   async findByTickerSimilarity(ticker: string, pagination = null) {
-    const options = getPaginationOptions(pagination);
     const regex = new RegExp(ticker, 'i');
-    return await this.tokenModel
-      .find({ ticker: { $regex: regex } }, null, options)
-      .exec();
+    const query = { ticker: { $regex: regex } };
+    const tokens = await findWithTotalCount(this.tokenModel, query, pagination);
+    return tokens;
   }
 
   async getBalance(
@@ -107,22 +114,30 @@ export class TokenService {
     ticker: string,
     id: number,
   ): Promise<BalanceEntity> {
-    try {
-      const token = await this.get(ticker, id);
-      if (token !== null) {
-        const address_amt = 'a_' + address + '_' + ticker + '_' + id;
-        const amt = JSON.parse(await this.leveldbService.get(address_amt));
-        return { decimals: token.decimals, amount: amt.value, ticker, id };
-      }
-    } catch (e) {}
+    const utxos = await this.utxoModel.find({ address, ticker, id }).exec();
+    if (utxos.length === 0) {
+      throw new NotFoundException({ error: 'token not found' });
+    }
 
-    throw new NotFoundException({ error: 'token not found' });
+    let totalAmount = 0n;
+    const decimals = utxos[0].decimals;
+
+    utxos.forEach((utxo: Utxo) => {
+      totalAmount += BigInt(utxo.amount);
+    });
+
+    return {
+      ticker,
+      id,
+      amount: totalAmount.toString(),
+      decimals,
+    };
   }
 
   async getBalancesForAddress(address: string): Promise<BalanceEntity[]> {
-    const utxos = await this.utxoModel.find({ address: address }).exec();
-    const balanceMap = new Map();
+    const utxos = await this.utxoModel.find({ address }).exec();
 
+    const balanceMap = new Map();
     utxos.forEach((utxo: Utxo) => {
       const key = `${utxo.ticker}-${utxo.id}`;
       const value = balanceMap.get(key) || { amount: 0n, decimals: 0 };
@@ -142,5 +157,29 @@ export class TokenService {
     });
 
     return balances;
+  }
+
+  async getHoldersByToken(ticker: string, id: number) {
+    const token = await this.tokenModel.find({ ticker, id }).limit(1).exec();
+
+    const balanceMap = new Map<string, { amount: bigint; decimals: number }>();
+    const utxos = await this.utxoModel.find({ ticker, id }).exec();
+    utxos.forEach((utxo: Utxo) => {
+      const address = utxo.address;
+      const balance = balanceMap.get(address) || {
+        amount: 0n,
+        decimals: utxo.decimals,
+      };
+
+      balance.amount += BigInt(utxo.amount);
+      balanceMap.set(address, balance);
+    });
+
+    const holders = Array.from(balanceMap, ([address, balance]) => ({
+      address,
+      amount: balance.amount.toString(),
+    }));
+
+    return { token, holders };
   }
 }

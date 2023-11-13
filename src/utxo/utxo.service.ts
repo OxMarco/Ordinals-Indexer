@@ -3,12 +3,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Utxo } from 'src/schemas/utxo';
-import { getPaginationOptions } from 'src/utils/helpers';
+import { findWithTotalCount } from 'src/utils/helpers';
 
 @Injectable()
 export class UtxoService {
@@ -19,34 +18,34 @@ export class UtxoService {
   }
 
   async getAll(pagination = null) {
-    const options = getPaginationOptions(pagination);
-    if (!options || Object.keys(options).length === 0)
-      throw new PayloadTooLargeException({
-        error: 'pagination options required',
-      });
-    const utxos = await this.utxoModel.find({}, null, options).exec();
+    const utxos = await findWithTotalCount(this.utxoModel, {}, pagination);
     return utxos;
   }
 
   async getByToken(ticker: string, id: number, pagination = null) {
-    const options = getPaginationOptions(pagination);
-    const utxos = await this.utxoModel
-      .find({ ticker, id }, null, options)
-      .exec();
+    const utxos = await findWithTotalCount(
+      this.utxoModel,
+      { ticker, id },
+      pagination,
+    );
     return utxos;
   }
 
   async getByTxId(txid: string, pagination = null) {
-    const options = getPaginationOptions(pagination);
-    const utxos = await this.utxoModel
-      .find({ txId: txid }, null, options)
-      .exec();
+    const utxos = await findWithTotalCount(
+      this.utxoModel,
+      { txId: txid },
+      pagination,
+    );
     return utxos;
   }
 
   async getByAddress(address: string, pagination = null) {
-    const options = getPaginationOptions(pagination);
-    const utxos = await this.utxoModel.find({ address }, null, options).exec();
+    const utxos = await findWithTotalCount(
+      this.utxoModel,
+      { address },
+      pagination,
+    );
     return utxos;
   }
 
@@ -73,9 +72,8 @@ export class UtxoService {
     });
 
     // Proceed with the query
-    const options = getPaginationOptions(pagination);
     const utxos = await this.utxoModel
-      .find({ $or: queryConditions }, null, options)
+      .find({ $or: queryConditions }, null, pagination)
       .exec();
     return utxos;
   }

@@ -1,9 +1,9 @@
-export async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export function getPaginationOptions(pagination: any) {
-  const { page, limit, sort } = pagination;
+export async function findWithTotalCount(
+  model: any,
+  query: any,
+  pagination: any = null,
+) {
+  const { page, limit, sort, filter } = pagination;
 
   const options: {
     limit: number;
@@ -24,7 +24,23 @@ export function getPaginationOptions(pagination: any) {
     options.sort = { createdAt: sort };
   }
 
-  return options;
+  if (filter === 'token') {
+    query.collectionAddress = { $eq: null };
+  } else if (filter === 'art') {
+    query.collectionAddress = { $ne: null };
+  }
+
+  const [results, totalCount] = await Promise.all([
+    model.find(query, null, options).exec(),
+    model.countDocuments(query).exec(),
+  ]);
+  results.recordsCount = totalCount;
+
+  return results;
+}
+
+export async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function cleanFloat(input: string) {
