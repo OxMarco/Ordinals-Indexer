@@ -63,8 +63,10 @@ export class IndexerService implements OnModuleInit {
           tokenData.remaining ?? existingToken.remaining;
         await existingToken.save();
       } else {
-        if(tokenData.mime && !this.supported_mimes.includes(tokenData.mime)) {
-          this.logger.error(`Unsupported mime type ${tokenData.mime} for token ${tokenData.ticker}:${tokenData.id}`)
+        if (tokenData.mime && !this.supported_mimes.includes(tokenData.mime)) {
+          this.logger.error(
+            `Unsupported mime type ${tokenData.mime} for token ${tokenData.ticker}:${tokenData.id}`,
+          );
         }
         tokenData.pid = this.pid;
         const newToken = new this.tokenModel(tokenData);
