@@ -51,21 +51,24 @@ services:
       - redis
 
   nginx:
-    image: "nginx:latest"
-    container_name: nginx
+    image: jonasal/nginx-certbot:latest
+    restart: unless-stopped
+    environment:
+      CERTBOT_EMAIL: "${CERTBOT_EMAIL}"
     ports:
-      - "80:80"
-      - "443:443"
-    restart: always
+      - 80:80
+      - 443:443
     volumes:
-      - ./nginx:/etc/nginx
+      - nginx_secrets:/etc/letsencrypt
+      - ./nginx:/etc/nginx/user_conf.d
     depends_on:
       nestjs:
         condition: service_started
     links:
       - nestjs
-
+    
 volumes:
   nestjs_data_container:
   mongodb_data_container:
   redis_data_container:
+  nginx_secrets:
