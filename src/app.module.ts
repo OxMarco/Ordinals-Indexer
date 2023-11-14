@@ -14,6 +14,7 @@ import { UtxoModule } from './utxo/utxo.module';
 import { BotModule } from './bot/bot.module';
 import { IndexerModule } from './indexer/indexer.module';
 import { LevelDBModule } from './leveldb/leveldb.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { LevelDBModule } from './leveldb/leveldb.module';
     UtxoModule,
     BotModule,
     IndexerModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
