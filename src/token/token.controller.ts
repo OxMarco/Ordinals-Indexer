@@ -172,12 +172,12 @@ export class TokenController {
     status: 200,
     type: [TokenEntity],
   })
-  @Get('/by-deployer/:address')
+  @Get('/by-txid/:txid')
   async getByTxId(
-    @Param('txId', LowercasePipe) txId: string,
+    @Param('txid', LowercasePipe) txid: string,
     @Pagination() pagination: any,
   ) {
-    const tokens = await this.tokenService.getByTxId(txId, pagination);
+    const tokens = await this.tokenService.getByTxId(txid, pagination);
     return tokens;
   }
 
