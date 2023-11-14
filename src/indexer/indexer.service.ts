@@ -8,6 +8,36 @@ import { Utxo } from 'src/schemas/utxo';
 export class IndexerService implements OnModuleInit {
   private readonly logger: Logger;
   private pid: number;
+  private supported_mimes = [
+    'application/json',
+    'application/pdf',
+    'application/pgp-signature',
+    'application/protobuf',
+    'application/yaml',
+    'audio/flac',
+    'audio/mpeg',
+    'audio/wav',
+    'image/apng',
+    'image/avif',
+    'image/gif',
+    'image/jpeg',
+    'image/png',
+    'image/svg+xml',
+    'image/webp',
+    'model/gltf+json',
+    'model/gltf-binary',
+    'model/stl',
+    'text/css',
+    'text/html',
+    'text/html;charset=utf-8',
+    'text/javascript',
+    'text/markdown',
+    'text/markdown;charset=utf-8',
+    'text/plain',
+    'text/plain;charset=utf-8',
+    'video/mp4',
+    'video/webm',
+  ];
 
   constructor(
     @InjectModel(Token.name) private tokenModel: Model<Token>,
@@ -33,6 +63,9 @@ export class IndexerService implements OnModuleInit {
           tokenData.remaining ?? existingToken.remaining;
         await existingToken.save();
       } else {
+        if(tokenData.mime && !this.supported_mimes.includes(tokenData.mime)) {
+          this.logger.error(`Unsupported mime type ${tokenData.mime} for token ${tokenData.ticker}:${tokenData.id}`)
+        }
         tokenData.pid = this.pid;
         const newToken = new this.tokenModel(tokenData);
         await newToken.save();
