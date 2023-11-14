@@ -5,14 +5,14 @@ import Arweave from 'arweave';
 
 @Injectable()
 export class AppService {
-  private token;
+  private ipfsToken;
   private arweaveKey: any;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    this.token = configService.get<string>('NFT_STORAGE_TOKEN');
+    this.ipfsToken = configService.get<string>('NFT_STORAGE_TOKEN');
     this.arweaveKey = JSON.parse(
       configService.get<string>('ARWEAVE_KEY') || '{}',
     );
@@ -41,7 +41,7 @@ export class AppService {
 
   async uploadFileToIPFS(file: Buffer) {
     const headersRequest = {
-      Authorization: `Bearer ${this.token}`,
+      Authorization: `Bearer ${this.ipfsToken}`,
       'Content-Type': 'application/octet-stream',
     };
 

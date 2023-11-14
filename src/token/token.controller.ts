@@ -241,6 +241,10 @@ export class TokenController {
   }
 
   @ApiOperation({ summary: 'Get the metadata related to a given token' })
+  @ApiResponse({
+    status: 200,
+    type: 'object',
+  })
   @Get('metadata/:ticker/:id')
   async getTokenMetadata(
     @Param('ticker', LowercasePipe) ticker: string,

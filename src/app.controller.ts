@@ -6,11 +6,14 @@ import {
   ParseFilePipeBuilder,
   Post,
   UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AppService } from './app.service';
 
 @Controller()
+@UseInterceptors(FileInterceptor('file'))
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
