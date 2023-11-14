@@ -27,7 +27,6 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
       indexerService,
     );
 
-    this.logger.log('Cronjob started');
     this.running = false;
   }
 
