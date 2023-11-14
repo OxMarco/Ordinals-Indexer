@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { UtxoEntity } from 'src/entities/utxo';
 import { Utxo } from 'src/schemas/utxo';
 import { findWithTotalCount } from 'src/utils/helpers';
 
@@ -17,12 +18,16 @@ export class UtxoService {
     this.logger = new Logger(UtxoService.name);
   }
 
-  async getAll(pagination = null) {
+  async getAll(pagination = null): Promise<UtxoEntity[]> {
     const utxos = await findWithTotalCount(this.utxoModel, {}, pagination);
     return utxos;
   }
 
-  async getByToken(ticker: string, id: number, pagination = null) {
+  async getByToken(
+    ticker: string,
+    id: number,
+    pagination = null,
+  ): Promise<UtxoEntity[]> {
     const utxos = await findWithTotalCount(
       this.utxoModel,
       { ticker, id },
@@ -31,7 +36,7 @@ export class UtxoService {
     return utxos;
   }
 
-  async getByTxId(txid: string, pagination = null) {
+  async getByTxId(txid: string, pagination = null): Promise<UtxoEntity[]> {
     const utxos = await findWithTotalCount(
       this.utxoModel,
       { txId: txid },
@@ -40,7 +45,10 @@ export class UtxoService {
     return utxos;
   }
 
-  async getByAddress(address: string, pagination = null) {
+  async getByAddress(
+    address: string,
+    pagination = null,
+  ): Promise<UtxoEntity[]> {
     const utxos = await findWithTotalCount(
       this.utxoModel,
       { address },
@@ -49,13 +57,13 @@ export class UtxoService {
     return utxos;
   }
 
-  async getByTxidVout(txid: string, vout: number) {
-    const utxo = await this.utxoModel.findOne({ txId: txid, vout }).exec();
+  async getByTxidVout(txid: string, vout: number): Promise<UtxoEntity> {
+    const utxo: any = await this.utxoModel.findOne({ txId: txid, vout }).exec();
     if (utxo) return utxo;
     else throw new NotFoundException({ error: 'utxo not found' });
   }
 
-  async searchUtxos(params: string, pagination = null) {
+  async searchUtxos(params: string, pagination = null): Promise<UtxoEntity[]> {
     const pairs = params.split(',');
 
     const queryConditions = pairs.map((pair) => {
@@ -71,8 +79,7 @@ export class UtxoService {
       return { txId, vout };
     });
 
-    // Proceed with the query
-    const utxos = await this.utxoModel
+    const utxos: any = await this.utxoModel
       .find({ $or: queryConditions }, null, pagination)
       .exec();
     return utxos;

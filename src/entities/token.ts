@@ -76,7 +76,7 @@ export class TokenEntity {
 
   @ApiPropertyOptional()
   @Expose()
-  amount?: number;
+  amount?: string;
 
   @ApiProperty()
   @Expose()

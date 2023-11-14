@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { BalanceEntity } from 'src/entities/balance';
+import { TokenEntity } from 'src/entities/token';
 import { Token } from 'src/schemas/token';
 import { Utxo } from 'src/schemas/utxo';
 import { findWithTotalCount } from 'src/utils/helpers';
@@ -17,18 +17,18 @@ export class TokenService {
     this.logger = new Logger(TokenService.name);
   }
 
-  async getAll(pagination = null) {
+  async getAll(pagination = null): Promise<TokenEntity[]> {
     const tokens = await findWithTotalCount(this.tokenModel, {}, pagination);
     return tokens;
   }
 
-  async get(ticker: string, id: number) {
-    const token = await this.tokenModel.findOne({ ticker, id }).exec();
+  async get(ticker: string, id: number): Promise<TokenEntity> {
+    const token: any = await this.tokenModel.findOne({ ticker, id }).exec();
     if (token) return token;
     else throw new NotFoundException({ error: 'token not found' });
   }
 
-  async getByTicker(ticker: string, pagination = null) {
+  async getByTicker(ticker: string, pagination = null): Promise<TokenEntity[]> {
     const tokens = await findWithTotalCount(
       this.tokenModel,
       { ticker },
@@ -37,7 +37,7 @@ export class TokenService {
     return tokens;
   }
 
-  async getByTxId(txId: string, pagination = null) {
+  async getByTxId(txId: string, pagination = null): Promise<TokenEntity[]> {
     const tokens = await findWithTotalCount(
       this.tokenModel,
       { txId },
@@ -46,21 +46,25 @@ export class TokenService {
     return tokens;
   }
 
-  async getByCollectionAddress(collection: string) {
-    const token = await this.tokenModel
+  async getByCollectionAddress(collection: string): Promise<TokenEntity> {
+    const token: any = await this.tokenModel
       .findOne({ collectionAddress: collection })
       .exec();
     if (token) return token;
     else throw new NotFoundException({ error: 'token not found' });
   }
 
-  async getByPid(pid: number) {
-    const token = await this.tokenModel.findOne({ pid }).exec();
+  async getByPid(pid: number): Promise<TokenEntity> {
+    const token: any = await this.tokenModel.findOne({ pid }).exec();
     if (token) return token;
     else throw new NotFoundException({ error: 'token not found' });
   }
 
-  async getByPidRange(start: number, stop: number, pagination = null) {
+  async getByPidRange(
+    start: number,
+    stop: number,
+    pagination = null,
+  ): Promise<TokenEntity[]> {
     const query = {
       pid: { $gte: start, $lte: stop },
     };
@@ -68,7 +72,7 @@ export class TokenService {
     return tokens;
   }
 
-  async getByBlock(block: number, pagination = null) {
+  async getByBlock(block: number, pagination = null): Promise<TokenEntity[]> {
     const tokens = await findWithTotalCount(
       this.tokenModel,
       { block },
@@ -77,7 +81,7 @@ export class TokenService {
     return tokens;
   }
 
-  async getByMimetype(mime: string, pagination = null) {
+  async getByMimetype(mime: string, pagination = null): Promise<TokenEntity[]> {
     const tokens = await findWithTotalCount(
       this.tokenModel,
       { mime },
@@ -86,7 +90,10 @@ export class TokenService {
     return tokens;
   }
 
-  async getByDeployer(beneficiaryAddress: string, pagination = null) {
+  async getByDeployer(
+    beneficiaryAddress: string,
+    pagination = null,
+  ): Promise<TokenEntity[]> {
     const tokens = await findWithTotalCount(
       this.tokenModel,
       { beneficiaryAddress },
@@ -95,14 +102,17 @@ export class TokenService {
     return tokens;
   }
 
-  async getTokenMetadata(ticker: string, id: number) {
+  async getTokenMetadata(ticker: string, id: number): Promise<any> {
     const token = await this.tokenModel.findOne({ ticker, id }).exec();
     if (token)
       return { metadata: token?.metadata, mime: token?.mime, ref: token?.ref };
     else throw new NotFoundException({ error: 'token not found' });
   }
 
-  async findByTickerSimilarity(ticker: string, pagination = null) {
+  async findByTickerSimilarity(
+    ticker: string,
+    pagination = null,
+  ): Promise<TokenEntity[]> {
     const regex = new RegExp(ticker, 'i');
     const query = { ticker: { $regex: regex } };
     const tokens = await findWithTotalCount(this.tokenModel, query, pagination);
@@ -113,73 +123,62 @@ export class TokenService {
     address: string,
     ticker: string,
     id: number,
-  ): Promise<BalanceEntity> {
+  ): Promise<TokenEntity> {
+    const token: any = await this.get(ticker, id);
     const utxos = await this.utxoModel.find({ address, ticker, id }).exec();
     if (utxos.length === 0) {
       throw new NotFoundException({ error: 'token not found' });
     }
 
     let totalAmount = 0n;
-    const decimals = utxos[0].decimals;
-
     utxos.forEach((utxo: Utxo) => {
       totalAmount += BigInt(utxo.amount);
     });
 
-    return {
-      ticker,
-      id,
-      amount: totalAmount.toString(),
-      decimals,
-    };
+    token.amount = totalAmount.toString();
+
+    return token;
   }
 
-  async getBalancesForAddress(address: string): Promise<BalanceEntity[]> {
+  async getBalancesForAddress(address: string): Promise<TokenEntity[]> {
     const utxos = await this.utxoModel.find({ address }).exec();
 
-    const balanceMap = new Map();
+    const balanceMap = new Map<string, bigint>();
     utxos.forEach((utxo: Utxo) => {
       const key = `${utxo.ticker}-${utxo.id}`;
-      const value = balanceMap.get(key) || { amount: 0n, decimals: 0 };
-      value.decimals = utxo.decimals;
-      value.amount += BigInt(utxo.amount);
+      let value = balanceMap.get(key) || 0n;
+      value += BigInt(utxo.amount);
       balanceMap.set(key, value);
     });
 
-    const balances = Array.from(balanceMap, ([key, value]) => {
-      const [ticker, id] = key.split('-');
-      return {
-        ticker,
-        id: Number(id),
-        amount: value.amount.toString(),
-        decimals: value.decimals,
-      };
-    });
+    const keys = Array.from(balanceMap.keys());
+    const tokens = await Promise.all(
+      keys.map(async (key) => {
+        const [ticker, id] = key.split('-');
+        const token: any = await this.get(ticker, Number(id));
+        token.amount = balanceMap.get(key)?.toString();
+        return token;
+      }),
+    );
 
-    return balances;
+    return tokens;
   }
 
-  async getHoldersByToken(ticker: string, id: number) {
-    const token = await this.tokenModel.find({ ticker, id }).limit(1).exec();
-
-    const balanceMap = new Map<string, { amount: bigint; decimals: number }>();
+  async getHoldersByToken(ticker: string, id: number): Promise<string> {
+    const balanceMap = new Map<string, bigint>();
     const utxos = await this.utxoModel.find({ ticker, id }).exec();
     utxos.forEach((utxo: Utxo) => {
       const address = utxo.address;
-      const balance = balanceMap.get(address) || {
-        amount: 0n,
-        decimals: utxo.decimals,
-      };
-
-      balance.amount += BigInt(utxo.amount);
+      let balance = balanceMap.get(address) || 0n;
+      balance += BigInt(utxo.amount);
       balanceMap.set(address, balance);
     });
 
     const holders = Array.from(balanceMap, ([address, balance]) => ({
       address,
-      amount: balance.amount.toString(),
+      amount: balance.toString(),
     }));
 
-    return { token, holders };
+    return JSON.stringify(holders);
   }
 }

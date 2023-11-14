@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  NotFoundException,
   Param,
   Query,
   UseInterceptors,
@@ -29,9 +28,8 @@ export class UtxoController {
     type: [UtxoEntity],
   })
   @Get('/')
-  async getAll(@Pagination() pagination: any) {
-    const utxos = await this.utxoService.getAll(pagination);
-    return utxos;
+  async getAll(@Pagination() pagination: any): Promise<UtxoEntity[]> {
+    return await this.utxoService.getAll(pagination);
   }
 
   @ApiOperation({ summary: 'Get all utxos related to the given txId' })
@@ -43,9 +41,8 @@ export class UtxoController {
   async getByTxId(
     @Param('txid', LowercasePipe) txid: string,
     @Pagination() pagination: any,
-  ) {
-    const utxos = await this.utxoService.getByTxId(txid, pagination);
-    return utxos;
+  ): Promise<UtxoEntity[]> {
+    return await this.utxoService.getByTxId(txid, pagination);
   }
 
   @ApiOperation({ summary: 'Get all utxos related to the given address' })
@@ -57,9 +54,8 @@ export class UtxoController {
   async getByAddress(
     @Param('address', LowercasePipe) address: string,
     @Pagination() pagination: any,
-  ) {
-    const utxos = await this.utxoService.getByAddress(address, pagination);
-    return utxos;
+  ): Promise<UtxoEntity[]> {
+    return await this.utxoService.getByAddress(address, pagination);
   }
 
   @ApiOperation({ summary: 'Get the utxo with the given txId and vout' })
@@ -71,11 +67,8 @@ export class UtxoController {
   async getByTxidVout(
     @Param('txid', LowercasePipe) txid: string,
     @Param('vout') vout: number,
-  ) {
-    const utxo = await this.utxoService.getByTxidVout(txid, vout);
-    if (!utxo) {
-      throw new NotFoundException({ error: 'utxo not found' });
-    }
+  ): Promise<UtxoEntity> {
+    return await this.utxoService.getByTxidVout(txid, vout);
   }
 
   @ApiOperation({
@@ -84,15 +77,14 @@ export class UtxoController {
   @ApiParam({
     name: 'params',
     type: String,
-    format: 'txid1_vout1,txid2_vout2,...,txidN_voutN',
+    format: '?params=txid1_vout1,txid2_vout2,...,txidN_voutN',
   })
   @ApiResponse({
     status: 200,
     type: [UtxoEntity],
   })
-  @Get('search')
+  @Get('/search')
   async search(@Query('params') params: string, @Pagination() pagination: any) {
-    const utxos = await this.utxoService.searchUtxos(params, pagination);
-    return utxos;
+    return await this.utxoService.searchUtxos(params, pagination);
   }
 }

@@ -1,5 +1,4 @@
 import {
-  ClassSerializerInterceptor,
   Controller,
   Get,
   NotFoundException,
@@ -10,7 +9,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { CacheInterceptor } from '@nestjs/cache-manager';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import axios from 'axios';
 import { Pagination } from 'src/decorators/pagination';
@@ -18,10 +17,8 @@ import { TokenService } from './token.service';
 import { TokenEntity } from 'src/entities/token';
 import { MongooseClassSerializerInterceptor } from 'src/interceptors/mongoose';
 import { PaginationInterceptor } from 'src/interceptors/pagination';
-import { BalanceEntity } from 'src/entities/balance';
 import { hexToString } from 'src/utils/helpers';
 import { LowercasePipe } from 'src/validation/lowercase';
-import { TokenExtendedEntity } from 'src/entities/token-extended';
 
 @Controller('token')
 @UseInterceptors(CacheInterceptor)
@@ -37,12 +34,17 @@ export class TokenController {
     type: [TokenEntity],
   })
   @Get('/')
-  async getAll(@Pagination() pagination: any) {
+  async getAll(@Pagination() pagination: any): Promise<TokenEntity[]> {
     const tokens = await this.tokenService.getAll(pagination);
     return tokens;
   }
 
   @ApiOperation({ summary: 'Search tokens by ticker' })
+  @ApiParam({
+    name: 'ticker',
+    type: String,
+    format: '?ticker=pip',
+  })
   @ApiResponse({
     status: 200,
     type: [TokenEntity],
@@ -51,7 +53,7 @@ export class TokenController {
   async searchByTicker(
     @Query('ticker') ticker: string,
     @Pagination() pagination: any,
-  ) {
+  ): Promise<TokenEntity[]> {
     const tokens = await this.tokenService.findByTickerSimilarity(
       ticker,
       pagination,
@@ -68,7 +70,7 @@ export class TokenController {
   async getByTicker(
     @Param('ticker', LowercasePipe) ticker: string,
     @Pagination() pagination: any,
-  ) {
+  ): Promise<TokenEntity[]> {
     const tokens = await this.tokenService.getByTicker(ticker, pagination);
     return tokens;
   }
@@ -82,12 +84,8 @@ export class TokenController {
   async get(
     @Param('ticker', LowercasePipe) ticker: string,
     @Param('id') id: number,
-  ) {
-    const token = await this.tokenService.get(ticker, id);
-    if (!token) {
-      throw new NotFoundException({ error: 'token not found' });
-    }
-    return token;
+  ): Promise<TokenEntity> {
+    return await this.tokenService.get(ticker, id);
   }
 
   @ApiOperation({ summary: 'Get a token by collection address' })
@@ -98,12 +96,8 @@ export class TokenController {
   @Get('/by-collection/:collection')
   async getByCollectionAddress(
     @Param('collection', LowercasePipe) collection: string,
-  ) {
-    const token = await this.tokenService.getByCollectionAddress(collection);
-    if (!token) {
-      throw new NotFoundException({ error: 'token not found' });
-    }
-    return token;
+  ): Promise<TokenEntity> {
+    return await this.tokenService.getByCollectionAddress(collection);
   }
 
   @ApiOperation({ summary: 'Get a token by pid' })
@@ -112,12 +106,8 @@ export class TokenController {
     type: TokenEntity,
   })
   @Get('/by-pid/:pid')
-  async getByPid(@Param('pid') pid: number) {
-    const token = await this.tokenService.getByPid(pid);
-    if (!token) {
-      throw new NotFoundException({ error: 'token not found' });
-    }
-    return token;
+  async getByPid(@Param('pid') pid: number): Promise<TokenEntity> {
+    return await this.tokenService.getByPid(pid);
   }
 
   @ApiOperation({ summary: 'Get tokens by pid range' })
@@ -130,13 +120,8 @@ export class TokenController {
     @Param('start') start: number,
     @Param('stop') stop: number,
     @Pagination() pagination: any,
-  ) {
-    const tokens = await this.tokenService.getByPidRange(
-      start,
-      stop,
-      pagination,
-    );
-    return tokens;
+  ): Promise<TokenEntity[]> {
+    return await this.tokenService.getByPidRange(start, stop, pagination);
   }
 
   @ApiOperation({ summary: 'Get tokens by block' })
@@ -148,9 +133,8 @@ export class TokenController {
   async getByBlock(
     @Param('block') block: number,
     @Pagination() pagination: any,
-  ) {
-    const tokens = await this.tokenService.getByBlock(block, pagination);
-    return tokens;
+  ): Promise<TokenEntity[]> {
+    return await this.tokenService.getByBlock(block, pagination);
   }
 
   @ApiOperation({ summary: 'Get tokens by deployer address' })
@@ -162,9 +146,8 @@ export class TokenController {
   async getByDeployer(
     @Param('address', LowercasePipe) address: string,
     @Pagination() pagination: any,
-  ) {
-    const tokens = await this.tokenService.getByDeployer(address, pagination);
-    return tokens;
+  ): Promise<TokenEntity[]> {
+    return await this.tokenService.getByDeployer(address, pagination);
   }
 
   @ApiOperation({ summary: 'Get tokens by transaction id' })
@@ -176,9 +159,8 @@ export class TokenController {
   async getByTxId(
     @Param('txid', LowercasePipe) txid: string,
     @Pagination() pagination: any,
-  ) {
-    const tokens = await this.tokenService.getByTxId(txid, pagination);
-    return tokens;
+  ): Promise<TokenEntity[]> {
+    return await this.tokenService.getByTxId(txid, pagination);
   }
 
   @ApiOperation({ summary: 'Get tokens by mime type' })
@@ -187,57 +169,50 @@ export class TokenController {
     type: [TokenEntity],
   })
   @Get('/by-mime/:mime')
-  async getByMime(@Param('mime') mime: string, @Pagination() pagination: any) {
-    const tokens = await this.tokenService.getByMimetype(mime, pagination);
-    return tokens;
+  async getByMime(
+    @Param('mime') mime: string,
+    @Pagination() pagination: any,
+  ): Promise<TokenEntity[]> {
+    return await this.tokenService.getByMimetype(mime, pagination);
   }
 
   @ApiOperation({ summary: 'Get all the holders for a specific token' })
   @ApiResponse({
     status: 200,
-    type: [TokenExtendedEntity],
+    type: String,
   })
-  @UseInterceptors(ClassSerializerInterceptor)
-  @Get('/get-holders/:ticker/:id/')
+  @Get('/holders/:ticker/:id')
   async getHoldersByToken(
     @Param('ticker', LowercasePipe) ticker: string,
     @Param('id') id: number,
-  ) {
-    const { token, holders } = await this.tokenService.getHoldersByToken(
-      ticker,
-      id,
-    );
-    return { token, holders };
+  ): Promise<string> {
+    return await this.tokenService.getHoldersByToken(ticker, id);
   }
 
   @ApiOperation({ summary: 'Get a specific token balance for a given address' })
   @ApiResponse({
     status: 200,
-    type: BalanceEntity,
+    type: TokenEntity,
   })
-  @UseInterceptors(ClassSerializerInterceptor)
   @Get('/get-balance/:ticker/:id/:address')
   async getBalanceByAddress(
     @Param('ticker', LowercasePipe) ticker: string,
     @Param('id') id: number,
     @Param('address', LowercasePipe) address: string,
-  ): Promise<BalanceEntity> {
-    const balance = await this.tokenService.getBalance(address, ticker, id);
-    return balance;
+  ): Promise<TokenEntity> {
+    return await this.tokenService.getBalance(address, ticker, id);
   }
 
   @ApiOperation({ summary: 'Get all tokens held by a given address' })
   @ApiResponse({
     status: 200,
-    type: [BalanceEntity],
+    type: [TokenEntity],
   })
-  @UseInterceptors(ClassSerializerInterceptor)
-  @Get('balances/:address')
+  @Get('/balances/:address')
   async getTokensByAddress(
     @Param('address', LowercasePipe) address: string,
-  ): Promise<BalanceEntity[]> {
-    const balances = await this.tokenService.getBalancesForAddress(address);
-    return balances;
+  ): Promise<TokenEntity[]> {
+    return await this.tokenService.getBalancesForAddress(address);
   }
 
   @ApiOperation({ summary: 'Get the metadata related to a given token' })
@@ -245,12 +220,12 @@ export class TokenController {
     status: 200,
     type: 'object',
   })
-  @Get('metadata/:ticker/:id')
+  @Get('/metadata/:ticker/:id')
   async getTokenMetadata(
     @Param('ticker', LowercasePipe) ticker: string,
     @Param('id') id: number,
     @Res() res: Response,
-  ) {
+  ): Promise<any> {
     const tokenData = await this.tokenService.getTokenMetadata(ticker, id);
 
     if (tokenData.ref) {
@@ -282,7 +257,6 @@ export class TokenController {
           res.setHeader('Content-Type', tokenData.mime);
           res.send(hexToString(tokenData.metadata));
           break;
-        case '\u0000\u0000':
         case 'image/webp':
         case 'image/png':
         case 'image/jpeg':
