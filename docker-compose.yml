@@ -38,6 +38,7 @@ services:
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
       NFT_STORAGE_TOKEN: "${NFT_STORAGE_TOKEN}"
+      ARWEAVE_KEY: "${ARWEAVE_KEY}"
     depends_on:
       mongo:
         condition: service_started

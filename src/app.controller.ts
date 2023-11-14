@@ -30,8 +30,8 @@ export class AppController {
     status: 200,
     type: String,
   })
-  @Post('upload')
-  async uploadFile(
+  @Post('/upload/arweave')
+  async uploadFileToArweave(
     @Body() body: any,
     @UploadedFile(
       new ParseFilePipeBuilder()
@@ -47,7 +47,34 @@ export class AppController {
     )
     file: Express.Multer.File,
   ) {
-    const cid = await this.appService.uploadFile(file.buffer);
+    const cid = await this.appService.uploadFileToArweave(file.buffer);
+    return { message: cid };
+  }
+
+  @ApiOperation({ summary: 'Upload a file to IPFS' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({
+    status: 200,
+    type: String,
+  })
+  @Post('/upload/ipfs')
+  async uploadFileToIPFS(
+    @Body() body: any,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: 'jpeg',
+        })
+        .addMaxSizeValidator({
+          maxSize: 10000,
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        }),
+    )
+    file: Express.Multer.File,
+  ) {
+    const cid = await this.appService.uploadFileToIPFS(file.buffer);
     return { message: cid };
   }
 }
