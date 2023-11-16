@@ -33,7 +33,7 @@ export class Indexer {
   private db;
   private legacy_block_end = 810000;
   private total_limit = 18446744073709551615n;
-  block = 809607;
+  private block = 809607;
 
   private op_table: any = {
     p: '50',
@@ -225,6 +225,18 @@ export class Indexer {
     } catch (e) {}
 
     return null;
+  }
+
+  async fixBlock() {
+    const chain_block = await this.getChainBlock();
+    const local_block = await this.db.get('bchk');
+
+    this.logger.debug('chain block', chain_block);
+    this.logger.debug('local block', local_block);
+
+    if (this.block < chain_block) {
+      this.block += 1;
+    }
   }
 
   async mustIndex() {

@@ -52,15 +52,39 @@ export class IndexerService implements OnModuleInit {
     else this.pid = records;
   }
 
-  async saveOrUpdateToken(tokenData: any) {
+  async getAll() {
+    return await this.tokenModel.find().exec();
+  }
+
+  async updateRemaining(ticker: string, id: number, remaining: string) {
+    try {
+      const token = await this.tokenModel.findOne({ ticker, id }).exec();
+      if (token) {
+        token.remaining = remaining;
+        await token.save();
+      } else {
+        this.logger.error(`Token ${ticker}:${id} not found`);
+      }
+    } catch (e) {
+      this.logger.error(
+        `Error occurred during update of token ${ticker}:${id}`,
+      );
+      this.logger.error(e);
+    }
+  }
+
+  async saveToken(tokenData: any) {
     try {
       const existingToken = await this.tokenModel
         .findOne({ ticker: tokenData.ticker, id: tokenData.id })
         .exec();
 
       if (existingToken) {
-        existingToken.remaining =
-          tokenData.remaining ?? existingToken.remaining;
+        await this.updateRemaining(
+          tokenData.ticker,
+          tokenData.id,
+          tokenData.remaining,
+        );
         await existingToken.save();
       } else {
         if (tokenData.mime && !this.supported_mimes.includes(tokenData.mime)) {

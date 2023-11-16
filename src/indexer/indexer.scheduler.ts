@@ -30,7 +30,7 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
     this.running = false;
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
     if (this.running) return;
 
@@ -42,27 +42,26 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   async runIndexing() {
     this.running = true;
 
-    this.logger.log(`Indexing block ${this.indexer.block}`);
-
+    this.logger.debug(`Indexing block`);
     const res = await this.indexer.index();
+    this.logger.debug(`Finished indexing block`);
+
     if (res == IndexerErrors.REORG) {
       await this.indexer.cleanup();
     } else if (res == IndexerErrors.BLOCK_AREADY_ANALYSED) {
-      this.indexer.block += 1;
+      await this.indexer.fixBlock();
     }
-
-    this.logger.log(`Finished indexing block ${this.indexer.block}`);
 
     this.running = false;
   }
 
   async onModuleInit() {
     await this.indexer.init();
-    this.logger.log('Cronjob started');
+    this.logger.log('Scheduler cronjob started');
   }
 
   async onModuleDestroy() {
     await this.indexer.close();
-    this.logger.log('Cronjob stopped');
+    this.logger.log('Scheduler cronjob stopped');
   }
 }

@@ -21,7 +21,7 @@ export class Token {
   decimals: number;
 
   @Prop({ required: true })
-  maxSupply: number;
+  maxSupply: string;
 
   @Prop({ required: true })
   limit: number;
@@ -32,7 +32,7 @@ export class Token {
       return this.maxSupply;
     },
   })
-  remaining: number;
+  remaining: string;
 
   @Prop({ required: false })
   mime?: string;

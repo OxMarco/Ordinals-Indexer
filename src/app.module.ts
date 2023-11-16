@@ -50,7 +50,7 @@ import { LevelDBModule } from './leveldb/leveldb.module';
       }),
       inject: [ConfigService],
     }),
-    /*NecordModule.forRootAsync({
+    NecordModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) =>
         ({
@@ -58,7 +58,7 @@ import { LevelDBModule } from './leveldb/leveldb.module';
           intents: ['Guilds', 'GuildMessages'],
         } as NecordModuleOptions),
       inject: [ConfigService],
-    }),*/
+    }),
     HttpModule.register({
       timeout: 5000,
       maxRedirects: 5,

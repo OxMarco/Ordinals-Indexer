@@ -6,6 +6,7 @@ import { UtxoService } from 'src/utxo/utxo.service';
 import { TokenService } from 'src/token/token.service';
 import { Token, TokenSchema } from 'src/schemas/token';
 import { Utxo, UtxoSchema } from 'src/schemas/utxo';
+import { IndexerAnalyser } from './indexer.analyser';
 
 @Module({
   imports: [
@@ -14,6 +15,12 @@ import { Utxo, UtxoSchema } from 'src/schemas/utxo';
       { name: Utxo.name, schema: UtxoSchema },
     ]),
   ],
-  providers: [IndexerService, TokenService, UtxoService, IndexScheduler],
+  providers: [
+    IndexerService,
+    TokenService,
+    UtxoService,
+    IndexScheduler,
+    IndexerAnalyser,
+  ],
 })
 export class IndexerModule {}

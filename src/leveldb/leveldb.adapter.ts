@@ -48,7 +48,7 @@ export class LevelDBAdapter {
       ref: parsedVal?.ref,
       metadata: parsedVal?.metadata,
     };
-    await this.indexerService.saveOrUpdateToken(data);
+    await this.indexerService.saveToken(data);
   }
 
   private async _hook(key: string, value: string) {

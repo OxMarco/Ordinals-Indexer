@@ -24,7 +24,7 @@ export class TokenEntity {
 
   @ApiProperty()
   @Expose()
-  maxSupply: number;
+  maxSupply: string;
 
   @ApiProperty()
   @Expose()
@@ -32,7 +32,7 @@ export class TokenEntity {
 
   @ApiProperty()
   @Expose()
-  remaining: number;
+  remaining: string;
 
   @ApiProperty()
   @Expose()

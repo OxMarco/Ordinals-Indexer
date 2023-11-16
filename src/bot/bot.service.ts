@@ -35,7 +35,7 @@ export class BotService {
     return interaction.reply({ content: 'GM!' });
   }
 
-  @SlashCommand({ name: 'help', description: 'Get support' })
+  /*@SlashCommand({ name: 'help', description: 'Get support' })
   public async onHelpRequest(
     @Context() [interaction]: SlashCommandContext,
     @Options() { text }: HelpRequestDto,
@@ -56,9 +56,28 @@ export class BotService {
       await interaction.editReply({ content: response });
     } catch (error) {
       await interaction.editReply({
-        content: 'There was an error processing your request.',
+        content: 'There was an error processing your request',
       });
     }
+  }*/
+
+  @SlashCommand({ name: 'holders', description: 'Get token holders' })
+  public async onHoldersRequest(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() { ticker, id }: TokenDto,
+  ) {
+    const holders = await this.tokenService.getHoldersByToken(ticker, id);
+    const data = JSON.parse(holders);
+    const length = data.length || 0;
+    if (length > 0)
+      return interaction.reply({
+        content:
+          'There are ' + String(length) + ' lucky holders for this token',
+      });
+    else
+      return interaction.reply({
+        content: `Token \`${ticker}:${id}\` not found`,
+      });
   }
 
   @SlashCommand({ name: 'token', description: 'Get token data' })
@@ -66,43 +85,47 @@ export class BotService {
     @Context() [interaction]: SlashCommandContext,
     @Options() { ticker, id }: TokenDto,
   ) {
-    const token = await this.tokenService.get(ticker, id);
-    if (!token) {
-      return interaction.reply({ content: `Token ${ticker}:${id} not found` });
-    }
+    try {
+      const token = await this.tokenService.get(ticker, id);
+      const name = `${ticker}:${id}`;
+      const description = `*Type*: ${token.collectionAddress ? 'Art' : 'Token'}
+      *Max supply*: ${token.maxSupply}
+      *Remaining*: ${token.remaining}
+      *Deployment block*: ${token.block}`;
 
-    const name = `Token ${ticker}:${id}`;
-    const description = `*Type*: ${token.collectionAddress ? 'Art' : 'Token'}
-    *MaxSupply*: ${token.maxSupply}
-    *Remaining #*: ${token.remaining}
-    *Deployment block*: ${token.block}`;
-
-    if (token?.mime && token.mime.includes('image'))
+      if (token?.mime && token.mime.includes('image'))
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle(name)
+              .setDescription(description)
+              .setImage(
+                'https://indexer.inspip.com/token/metadata/' +
+                  token.ticker +
+                  '/' +
+                  token.id,
+              ),
+          ],
+        });
+      else if (token?.ref) {
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle(name)
+              .setDescription(description)
+              .setImage(token.ref),
+          ],
+        });
+      } else {
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder().setTitle(name).setDescription(description),
+          ],
+        });
+      }
+    } catch (e) {
       return interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle(name)
-            .setDescription(description)
-            .setImage(
-              'https://indexer.inspip.com/token/metadata/' +
-                token.ticker +
-                '/' +
-                token.id,
-            ),
-        ],
-      });
-    else if (token?.ref) {
-      return interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle(name)
-            .setDescription(description)
-            .setImage(token.ref),
-        ],
-      });
-    } else {
-      return interaction.reply({
-        embeds: [new EmbedBuilder().setTitle(name).setDescription(description)],
+        content: `Token \`${ticker}:${id}\` not found`,
       });
     }
   }
