@@ -42,9 +42,7 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   async runIndexing() {
     this.running = true;
 
-    this.logger.debug(`Indexing block`);
     const res = await this.indexer.index();
-    this.logger.debug(`Finished indexing block`);
 
     if (res == IndexerErrors.REORG) {
       await this.indexer.cleanup();

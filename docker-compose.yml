@@ -52,6 +52,7 @@ services:
 
   nginx:
     image: jonasal/nginx-certbot:latest
+    container_name: nginx
     restart: unless-stopped
     environment:
       CERTBOT_EMAIL: "${CERTBOT_EMAIL}"
