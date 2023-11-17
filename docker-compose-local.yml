@@ -14,8 +14,8 @@ services:
       - 27017:27017
 
   nestjs:
-    container_name: nestjs
     build: .
+    container_name: nestjs-backend
     stop_signal: SIGTERM
     stop_grace_period: 200s
     environment:
@@ -23,7 +23,6 @@ services:
       DATABASE_URL: "mongodb://mongoadmin:mongopassword@mongo:27017/nestjsdb?authSource=admin"
       DATABASE_USER: "mongoadmin"
       DATABASE_PASSWORD: "mongopassword"
-      OPENAI_API_KEY: "${OPENAI_API_KEY}"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
       NFT_STORAGE_TOKEN: "${NFT_STORAGE_TOKEN}"
       ARWEAVE_KEY: "${ARWEAVE_KEY}"
