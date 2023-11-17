@@ -8,7 +8,6 @@ import {
   UnsupportedMediaTypeException,
   UseInterceptors,
 } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import axios from 'axios';
@@ -21,7 +20,6 @@ import { hexToString } from 'src/utils/helpers';
 import { LowercasePipe } from 'src/validation/lowercase';
 
 @Controller('token')
-@UseInterceptors(CacheInterceptor)
 @UseInterceptors(PaginationInterceptor)
 @MongooseClassSerializerInterceptor(TokenEntity)
 @ApiTags('token')

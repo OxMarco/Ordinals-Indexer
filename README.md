@@ -25,4 +25,3 @@ Contains the indexer peripheral logic:
 - MongoDB with Mongoose
 - Redis queue
 - Necord with discord.js
-- OpenAI lib

@@ -22,7 +22,7 @@ export class RPC {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 2000,
+      timeout: 5000,
     };
 
     const baseDelay = 1000;
@@ -32,12 +32,16 @@ export class RPC {
         const response = await axios.post(this.rpcEndpoint, payload, config);
         return response.data.result;
       } catch (error) {
-        if (attempt === 4) {
+        if (error.response) {
           this.logger.error(
-            `RPC Command Failed: ${method} ${JSON.stringify(params)}`,
+            `RPC request ${method} ${JSON.stringify(params)} failed with error: ${error.message}, ${JSON.stringify(error.response.data)}`
           );
-          return null;
+        } else {
+          this.logger.error(
+            `RPC request ${method} ${JSON.stringify(params)} failed with error: ${error.message}`
+          );
         }
+        if (attempt === 4) return null;
         await sleep(Math.pow(2, attempt) * delay);
       }
     }

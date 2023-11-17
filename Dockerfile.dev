@@ -20,7 +20,7 @@ COPY . .
 RUN npm run build
 
 # Expose ports
-EXPOSE 3000
+EXPOSE 3000 9229
 
 # Command to run the application
-CMD ["npm", "run", "start:prod"]
+CMD ["npm", "--inspect=0.0.0.0:9229", "start"]
