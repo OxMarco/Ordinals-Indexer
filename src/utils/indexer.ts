@@ -120,7 +120,6 @@ export class Indexer {
   }
 
   async close() {
-    this.logger.debug('Interrupt signal received, closing indexer');
     while (true) {
       try {
         await this.db.get('mrk');
@@ -136,6 +135,7 @@ export class Indexer {
   async cleanup() {
     const toBlock = this.block;
     const fromBlock = toBlock - 8;
+    this.logger.debug('Cleaning up from block ' + fromBlock + ' to ' + toBlock);
     for (let block = fromBlock; block <= toBlock; block++) {
       this.db.removeAll(block);
     }

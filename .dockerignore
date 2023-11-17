@@ -4,7 +4,6 @@ Dockerfile
 .DS_Store
 docker-compose.yml
 docker-compose-local.yml
-pipe_db
 dist
 data
 node_modules
