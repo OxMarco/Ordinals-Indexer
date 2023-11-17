@@ -40,4 +40,4 @@ lerna-debug.log*
 .env
 
 # db
-leveldb
+pipe_db
