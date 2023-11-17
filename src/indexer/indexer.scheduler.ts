@@ -77,8 +77,6 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
             token.id,
             deployment.rem,
           );
-        } else {
-          this.logger.debug('All good');
         }
       } catch (e) {
         this.logger.error(

@@ -229,12 +229,8 @@ export class Indexer {
 
   async fixBlock() {
     const chain_block = await this.getChainBlock();
-    const local_block = await this.db.get('bchk');
 
     if (chain_block > this.block) {
-      this.logger.debug(
-        'chain block ' + chain_block + ' local block ' + local_block,
-      );
       this.block += 1;
     }
   }
