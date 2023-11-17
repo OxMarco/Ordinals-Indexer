@@ -23,6 +23,4 @@ Contains the indexer peripheral logic:
 ## Tech Stack
 - NestJS
 - MongoDB with Mongoose
-- Redis queue
 - Necord with discord.js
-- OpenAI lib

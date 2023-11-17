@@ -14,7 +14,8 @@ import { IndexerService } from './indexer.service';
 export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IndexScheduler.name);
   private indexer;
-  private running;
+  private runningIndexing;
+  private runningAnalyser;
 
   constructor(
     private readonly leveldbService: LevelDBService,
@@ -27,39 +28,73 @@ export class IndexScheduler implements OnModuleInit, OnModuleDestroy {
       indexerService,
     );
 
-    this.running = false;
+    this.runningIndexing = false;
+    this.runningAnalyser = false;
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
-  async handleCron() {
-    if (this.running) return;
+  async handleIndexing() {
+    if (this.runningIndexing) return;
+
+    this.runningIndexing = true;
 
     if (await this.indexer.mustIndex()) {
-      await this.runIndexing();
+      const res = await this.indexer.index();
+
+      if (res == IndexerErrors.REORG) {
+        await this.indexer.cleanup();
+      } else if (res == IndexerErrors.BLOCK_AREADY_ANALYSED) {
+        await this.indexer.fixBlock();
+      }
     }
+
+    this.runningIndexing = false;
   }
 
-  async runIndexing() {
-    this.running = true;
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleAnalysing() {
+    if (this.runningAnalyser) return;
 
-    const res = await this.indexer.index();
+    this.runningAnalyser = true;
 
-    if (res == IndexerErrors.REORG) {
-      await this.indexer.cleanup();
-    } else if (res == IndexerErrors.BLOCK_AREADY_ANALYSED) {
-      await this.indexer.fixBlock();
+    const tokens = await this.indexerService.getAll();
+    for (const token of tokens) {
+      try {
+        const data = await this.leveldbService.get(
+          'd_' + token.ticker + '_' + token.id,
+        );
+        const ddd = JSON.parse(data);
+        const deployment = JSON.parse(ddd.value);
+        if (deployment.rem !== token.remaining) {
+          this.logger.warn(
+            'Mismatch on remaining amount for token ' +
+              token.ticker +
+              ':' +
+              token.id,
+          );
+          await this.indexerService.updateRemaining(
+            token.ticker,
+            token.id,
+            deployment.rem,
+          );
+        }
+      } catch (e) {
+        this.logger.error(
+          'Token ' + token.ticker + ':' + token.id + ' not found on leveldb',
+        );
+      }
     }
 
-    this.running = false;
+    this.runningAnalyser = false;
   }
 
   async onModuleInit() {
     await this.indexer.init();
-    this.logger.log('Scheduler cronjob started');
+    this.logger.log('Scheduler started');
   }
 
   async onModuleDestroy() {
     await this.indexer.close();
-    this.logger.log('Scheduler cronjob stopped');
+    this.logger.log('Scheduler stopped');
   }
 }

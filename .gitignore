@@ -1,6 +1,8 @@
 # compiled output
 /dist
+/data
 /node_modules
+/user_conf.d
 
 # Logs
 logs
@@ -38,4 +40,5 @@ lerna-debug.log*
 .env
 
 # db
-pipe_db/
+pipe_db
+leveldb

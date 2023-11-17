@@ -1,15 +1,6 @@
 version: '3.8'
 
 services:
-  redis:
-    image: "redis:latest"
-    container_name: redis
-    command: redis-server --requirepass redispassword
-    environment:
-      - REDIS_REPLICATION_MODE=master
-    volumes:
-      - redis_data_container:/data
-
   mongo:
     image: "mongo:latest"
     container_name: mongo
@@ -23,7 +14,7 @@ services:
       - 27017:27017
 
   nestjs:
-    container_name: nestjs-backend
+    container_name: nestjs
     build: .
     stop_signal: SIGTERM
     stop_grace_period: 200s
@@ -32,11 +23,6 @@ services:
       DATABASE_URL: "mongodb://mongoadmin:mongopassword@mongo:27017/nestjsdb?authSource=admin"
       DATABASE_USER: "mongoadmin"
       DATABASE_PASSWORD: "mongopassword"
-      REDIS_HOST: "redis"
-      REDIS_PORT: "6379"
-      REDIS_USERNAME: "redisuser"
-      REDIS_PASSWORD: "redispassword"
-      REDIS_DB_NAME: "nestjsredis"
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
       NFT_STORAGE_TOKEN: "${NFT_STORAGE_TOKEN}"
@@ -46,12 +32,9 @@ services:
     depends_on:
       mongo:
         condition: service_started
-      redis:
-        condition: service_started
     volumes:
       - nestjs_data_container:/usr/src/app
     
 volumes:
   nestjs_data_container:
   mongodb_data_container:
-  redis_data_container:

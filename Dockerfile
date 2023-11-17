@@ -2,10 +2,10 @@
 FROM node:lts
 
 # Set the working directory in the container
-WORKDIR /usr/src/nestjs
+WORKDIR /usr/src/app
 
-# Remove the contents of the working directory
-RUN rm -rf /usr/src/nestjs/*
+# Invalidate the cache
+ARG CACHEBUST=1
 
 # Copy package.json and package-lock.json into the working directory
 COPY package*.json ./

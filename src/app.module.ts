@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { BullModule } from '@nestjs/bull';
-import { CacheModule } from '@nestjs/cache-manager';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
 import { NecordModule, NecordModuleOptions } from 'necord';
@@ -26,10 +24,6 @@ import { LevelDBModule } from './leveldb/leveldb.module';
       },
     ]),
     ScheduleModule.forRoot(),
-    CacheModule.register({
-      ttl: 60 * 5, // time in seconds (5 minutes)
-      isGlobal: true,
-    }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -37,20 +31,7 @@ import { LevelDBModule } from './leveldb/leveldb.module';
       }),
       inject: [ConfigService],
     }),
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        redis: {
-          name: configService.get<string>('REDIS_DB_NAME'),
-          host: configService.get<string>('REDIS_HOST'),
-          port: configService.get<number>('REDIS_PORT'),
-          username: configService.get<string>('REDIS_USERNAME'),
-          password: configService.get<string>('REDIS_PASSWORD'),
-        },
-      }),
-      inject: [ConfigService],
-    }),
-    /*NecordModule.forRootAsync({
+    NecordModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) =>
         ({
@@ -58,7 +39,7 @@ import { LevelDBModule } from './leveldb/leveldb.module';
           intents: ['Guilds', 'GuildMessages'],
         } as NecordModuleOptions),
       inject: [ConfigService],
-    }),*/
+    }),
     HttpModule.register({
       timeout: 5000,
       maxRedirects: 5,

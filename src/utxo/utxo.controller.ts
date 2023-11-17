@@ -1,5 +1,4 @@
 import { Controller, Get, Param, Query, UseInterceptors } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UtxoService } from './utxo.service';
 import { Pagination } from 'src/decorators/pagination';
@@ -9,7 +8,6 @@ import { UtxoEntity } from 'src/entities/utxo';
 import { LowercasePipe } from 'src/validation/lowercase';
 
 @Controller('utxo')
-@UseInterceptors(CacheInterceptor)
 @UseInterceptors(PaginationInterceptor)
 @MongooseClassSerializerInterceptor(UtxoEntity)
 @ApiTags('utxo')

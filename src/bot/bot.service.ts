@@ -2,64 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { EmbedBuilder } from 'discord.js';
 import { Context, Options, SlashCommand, SlashCommandContext } from 'necord';
 import { TokenDto } from 'src/dtos/token';
-import { HelpRequestDto } from 'src/dtos/help-request';
 import { TokenService } from '../token/token.service';
-import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
 
 @Injectable()
 export class BotService {
-  private openai;
-
-  constructor(
-    private configService: ConfigService,
-    private tokenService: TokenService,
-  ) {
-    const key = this.configService.get<string>('OPENAI_API_KEY');
-    this.openai = new OpenAI({
-      apiKey: key,
-    });
-  }
-
-  async askChatGPT(text: string) {
-    const chatCompletion: OpenAI.Chat.ChatCompletion =
-      await this.openai.chat.completions.create({
-        messages: [{ role: 'user', content: text }],
-        model: 'gpt-3.5-turbo',
-      });
-    return chatCompletion.choices[0].message.content;
-  }
+  constructor(private tokenService: TokenService) {}
 
   @SlashCommand({ name: 'gm', description: 'GM Command' })
   public async onPingRequest(@Context() [interaction]: SlashCommandContext) {
     return interaction.reply({ content: 'GM!' });
   }
 
-  /*@SlashCommand({ name: 'help', description: 'Get support' })
-  public async onHelpRequest(
-    @Context() [interaction]: SlashCommandContext,
-    @Options() { text }: HelpRequestDto,
-  ) {
-    const responses = [
-      "Hang tight, I'm on it...",
-      'Let me think about that...',
-      'Sure thing! Coming up with an answer...',
-      'Processing...beep..boop...',
-      'I wish I knew! Let me ask my friend...',
-    ];
-
-    const response = responses[Math.floor(Math.random() * responses.length)];
-    await interaction.reply({ content: response });
-
-    try {
-      const response = await this.askChatGPT(text);
-      await interaction.editReply({ content: response });
-    } catch (error) {
-      await interaction.editReply({
-        content: 'There was an error processing your request',
-      });
-    }
-  }*/
+  @SlashCommand({ name: 'faq', description: 'Show the FAQ' })
+  public async onFaqRequest(@Context() [interaction]: SlashCommandContext) {
+    return interaction.reply({
+      content:
+        '*Pipe Protocol:* an evolution on Ordinals for inscriptions on Bitcoin core\
+      *What you can do with it:* deploy, mint and transfer both fungible and non fungible tokens\
+      *Why it is different:* allows for truly open mints and account-based logic',
+    });
+  }
 
   @SlashCommand({ name: 'holders', description: 'Get token holders' })
   public async onHoldersRequest(
