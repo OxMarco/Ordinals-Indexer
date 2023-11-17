@@ -4,7 +4,8 @@ services:
   redis:
     image: "redis:latest"
     container_name: redis
-    command: redis-server --requirepass redispassword
+    stop_signal: SIGTERM
+    stop_grace_period: 200s
     environment:
       - REDIS_REPLICATION_MODE=master
     volumes:
@@ -13,6 +14,8 @@ services:
   mongo:
     image: "mongo:latest"
     container_name: mongo
+    stop_signal: SIGTERM
+    stop_grace_period: 200s
     environment:
       MONGO_INITDB_ROOT_USERNAME: mongoadmin
       MONGO_INITDB_ROOT_PASSWORD: mongopassword
@@ -23,8 +26,10 @@ services:
       - 27017:27017
 
   nestjs:
-    container_name: nestjs-backend
-    build: .
+    container_name: nestjs
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     stop_signal: SIGTERM
     stop_grace_period: 200s
     environment:
@@ -34,10 +39,6 @@ services:
       DATABASE_PASSWORD: "mongopassword"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      REDIS_USERNAME: "redisuser"
-      REDIS_PASSWORD: "redispassword"
-      REDIS_DB_NAME: "nestjsredis"
-      OPENAI_API_KEY: "${OPENAI_API_KEY}"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
       NFT_STORAGE_TOKEN: "${NFT_STORAGE_TOKEN}"
       ARWEAVE_KEY: "${ARWEAVE_KEY}"

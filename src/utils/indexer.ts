@@ -227,14 +227,10 @@ export class Indexer {
     return null;
   }
 
-  async fixBlock() {
+  async syncBlock() {
     const chain_block = await this.getChainBlock();
-    const local_block = await this.db.get('bchk');
 
     if (chain_block > this.block) {
-      this.logger.debug(
-        'chain block ' + chain_block + ' local block ' + local_block,
-      );
       this.block += 1;
     }
   }
@@ -265,6 +261,13 @@ export class Indexer {
 
         if (block_check >= this.block) {
           this.logger.warn('Block already analysed');
+          const chain_block = await this.getChainBlock();
+          const local_block = await this.db.get('b');
+          const check_block = await this.db.get('bchk');
+          this.logger.debug(
+            'chain block ' + chain_block + ' - local block ' + local_block
+            + ' - check_block ' + check_block
+          );
           return IndexerErrors.BLOCK_AREADY_ANALYSED;
         }
       } catch (e) {}
