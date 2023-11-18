@@ -24,8 +24,6 @@ services:
       DATABASE_USER: "mongoadmin"
       DATABASE_PASSWORD: "mongopassword"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
-      NFT_STORAGE_TOKEN: "${NFT_STORAGE_TOKEN}"
-      ARWEAVE_KEY: "${ARWEAVE_KEY}"
     ports:
       - 3000:3000
     depends_on:

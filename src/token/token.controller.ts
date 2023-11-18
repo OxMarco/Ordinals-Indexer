@@ -86,16 +86,20 @@ export class TokenController {
     return await this.tokenService.get(ticker, id);
   }
 
-  @ApiOperation({ summary: 'Get a token by collection address' })
+  @ApiOperation({ summary: 'Get tokens by collection address' })
   @ApiResponse({
     status: 200,
-    type: TokenEntity,
+    type: [TokenEntity],
   })
   @Get('/by-collection/:collection')
   async getByCollectionAddress(
     @Param('collection', LowercasePipe) collection: string,
-  ): Promise<TokenEntity> {
-    return await this.tokenService.getByCollectionAddress(collection);
+    @Pagination() pagination: any,
+  ): Promise<TokenEntity[]> {
+    return await this.tokenService.getByCollectionAddress(
+      collection,
+      pagination,
+    );
   }
 
   @ApiOperation({ summary: 'Get a token by pid' })

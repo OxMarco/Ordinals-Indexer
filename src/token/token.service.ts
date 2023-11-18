@@ -46,12 +46,16 @@ export class TokenService {
     return tokens;
   }
 
-  async getByCollectionAddress(collection: string): Promise<TokenEntity> {
-    const token: any = await this.tokenModel
-      .findOne({ collectionAddress: collection })
-      .exec();
-    if (token) return token;
-    else throw new NotFoundException({ error: 'token not found' });
+  async getByCollectionAddress(
+    collectionAddress: string,
+    pagination = null,
+  ): Promise<TokenEntity[]> {
+    const tokens = await findWithTotalCount(
+      this.tokenModel,
+      { collectionAddress },
+      pagination,
+    );
+    return tokens;
   }
 
   async getByPid(pid: number): Promise<TokenEntity> {

@@ -31,7 +31,6 @@
     "@nestjs/swagger": "^7.1.14",
     "@nestjs/throttler": "^5.0.0",
     "@types/multer": "^1.4.9",
-    "arweave": "^1.14.4",
     "axios": "^1.6.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
