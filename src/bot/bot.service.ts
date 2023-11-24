@@ -28,18 +28,24 @@ export class BotService {
     @Context() [interaction]: SlashCommandContext,
     @Options() { ticker, id }: TokenDto,
   ) {
-    const holders = await this.tokenService.getHoldersByToken(ticker, id);
-    const data = JSON.parse(holders);
-    const length = data.length || 0;
-    if (length > 0)
+    try {
+      const holders = await this.tokenService.getHoldersByToken(ticker, id);
+      const data = JSON.parse(holders);
+      const length = data.length || 0;
+      if (length > 0)
+        return interaction.reply({
+          content:
+            'There are ' + String(length) + ' lucky holders for this token',
+        });
+      else
+        return interaction.reply({
+          content: `Token \`${ticker}:${id}\` not found`,
+        });
+    } catch (e) {
       return interaction.reply({
-        content:
-          'There are ' + String(length) + ' lucky holders for this token',
+        content: 'Generic error',
       });
-    else
-      return interaction.reply({
-        content: `Token \`${ticker}:${id}\` not found`,
-      });
+    }
   }
 
   @SlashCommand({ name: 'token', description: 'Get token data' })

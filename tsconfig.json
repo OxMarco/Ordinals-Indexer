@@ -2,10 +2,10 @@
   "compilerOptions": {
     "module": "commonjs",
     "declaration": true,
-    "allowJs": true,
+    "allowJs": true, // @todo remove
     "removeComments": true,
     "emitDecoratorMetadata": true,
-    "esModuleInterop": true,
+    "esModuleInterop": true, // @todo remove
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2022",

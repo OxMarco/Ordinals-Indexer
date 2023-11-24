@@ -191,6 +191,18 @@ export class TokenController {
     return await this.tokenService.getHoldersByToken(ticker, id);
   }
 
+  @ApiOperation({ summary: 'Get all the holders for a specific ticker' })
+  @ApiResponse({
+    status: 200,
+    type: String,
+  })
+  @Get('/holders/:ticker')
+  async getHoldersByTicker(
+    @Param('ticker', LowercasePipe) ticker: string,
+  ): Promise<string> {
+    return await this.tokenService.getHoldersByTicker(ticker);
+  }
+
   @ApiOperation({ summary: 'Get a specific token balance for a given address' })
   @ApiResponse({
     status: 200,
